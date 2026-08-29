@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 using System.Diagnostics;
+using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.SNSEvents;
 using Amazon.Lambda.SQSEvents;
 using OpenTelemetry.Resources;
@@ -36,6 +37,9 @@ public class AWSLambdaWrapperTests : IDisposable
     public void Dispose()
     {
         this.environmentScope.Dispose();
+
+        // Guard against baggage leaking into other tests in the shared collection.
+        Baggage.Current = default;
 
         // reset Semantic Convention to default
         Sdk.CreateTracerProviderBuilder()
@@ -404,6 +408,163 @@ public class AWSLambdaWrapperTests : IDisposable
 
         var item = Assert.Single(exportedItems);
         Assert.Equal("pubsub", item.GetTagValue(ExpectedSemanticConventions.AttributeFaasTrigger));
+    }
+
+    [Fact]
+    public void TraceSyncSqsEventDoesNotPropagateBaggageWhenParentNotSetFromBatch()
+    {
+        // With SetParentFromBatch disabled no record is chosen as the parent, so there is
+        // deliberately no context - and therefore no baggage - extracted from the batch.
+        var sqsEvent = CreateSqsEventWithBaggage("key1=value1");
+
+        using (var tracerProvider = Sdk.CreateTracerProviderBuilder()
+                   .AddAWSLambdaConfigurations(opt =>
+                   {
+                       opt.SemanticConventionVersion = SemanticConventionVersion.Latest;
+                       opt.SetParentFromBatch = false;
+                   })
+                   .Build()!)
+        {
+            AWSLambdaWrapper.Trace(tracerProvider, this.sampleHandlers.SampleHandlerSyncSqsEventCapturingBaggage, sqsEvent, this.sampleLambdaContext);
+        }
+
+        Assert.NotNull(this.sampleHandlers.ObservedBaggage);
+        Assert.Empty(this.sampleHandlers.ObservedBaggage);
+    }
+
+    [Fact]
+    public void TraceSyncApiGatewayRequestPropagatesBaggageToHandler()
+    {
+        // HTTP triggers extract from request headers rather than message attributes.
+        var request = new APIGatewayProxyRequest
+        {
+            Headers = new Dictionary<string, string> { ["baggage"] = "key1=value1" },
+        };
+
+        using (var tracerProvider = Sdk.CreateTracerProviderBuilder()
+                   .AddAWSLambdaConfigurations(opt =>
+                   {
+                       opt.SemanticConventionVersion = SemanticConventionVersion.Latest;
+                   })
+                   .Build()!)
+        {
+            AWSLambdaWrapper.Trace(tracerProvider, this.sampleHandlers.SampleHandlerSyncApiGatewayCapturingBaggage, request, this.sampleLambdaContext);
+        }
+
+        AssertBaggage(this.sampleHandlers.ObservedBaggage, "key1=value1");
+    }
+
+    [Fact]
+    public async Task TraceAsyncRestoresCallerBaggageAfterInvocation()
+    {
+        var sqsEvent = CreateSqsEventWithBaggage("key1=value1");
+        Baggage.Current = Baggage.Create(new Dictionary<string, string> { ["callerKey"] = "callerValue" });
+
+        using (var tracerProvider = Sdk.CreateTracerProviderBuilder()
+                   .AddAWSLambdaConfigurations(opt =>
+                   {
+                       opt.SemanticConventionVersion = SemanticConventionVersion.Latest;
+                       opt.SetParentFromBatch = true;
+                   })
+                   .Build()!)
+        {
+            await AWSLambdaWrapper.TraceAsync(tracerProvider, this.sampleHandlers.SampleHandlerAsyncSqsEventCapturingBaggage, sqsEvent, this.sampleLambdaContext);
+        }
+
+        AssertBaggage(this.sampleHandlers.ObservedBaggage, "key1=value1");
+        AssertBaggage(Baggage.Current.GetBaggage(), "callerKey=callerValue");
+        Baggage.Current = default;
+    }
+
+    [Fact]
+    public void TraceSyncClearsInvocationBaggageWhenHandlerThrows()
+    {
+        var sqsEvent = CreateSqsEventWithBaggage("key1=value1");
+
+        using (var tracerProvider = Sdk.CreateTracerProviderBuilder()
+                   .AddAWSLambdaConfigurations(opt =>
+                   {
+                       opt.SemanticConventionVersion = SemanticConventionVersion.Latest;
+                       opt.SetParentFromBatch = true;
+                   })
+                   .Build()!)
+        {
+            Assert.Throws<InvalidOperationException>(() =>
+                AWSLambdaWrapper.Trace(tracerProvider, this.sampleHandlers.SampleHandlerSyncSqsEventCapturingBaggageThenThrowing, sqsEvent, this.sampleLambdaContext));
+        }
+
+        AssertBaggage(this.sampleHandlers.ObservedBaggage, "key1=value1");
+        Assert.Empty(Baggage.Current.GetBaggage());
+    }
+
+    [Fact]
+    public void TraceSyncPreservesCallerBaggageWhenRequestCarriesNone()
+    {
+        // The caller's baggage must survive an invocation whose input carries none: the wrapper
+        // only replaces baggage that the incoming request actually supplied.
+        Baggage.Current = Baggage.Create(new Dictionary<string, string> { ["callerKey"] = "callerValue" });
+
+        try
+        {
+            using (var tracerProvider = Sdk.CreateTracerProviderBuilder()
+                       .AddAWSLambdaConfigurations(opt =>
+                       {
+                           opt.SemanticConventionVersion = SemanticConventionVersion.Latest;
+                           opt.SetParentFromBatch = true;
+                       })
+                       .Build()!)
+            {
+                AWSLambdaWrapper.Trace(tracerProvider, this.sampleHandlers.SampleHandlerSyncSqsEventCapturingBaggage, new SQSEvent(), this.sampleLambdaContext);
+            }
+
+            AssertBaggage(this.sampleHandlers.ObservedBaggage, "callerKey=callerValue");
+            AssertBaggage(Baggage.Current.GetBaggage(), "callerKey=callerValue");
+        }
+        finally
+        {
+            Baggage.Current = default;
+        }
+    }
+
+    [Fact]
+    public void TraceSyncDoesNotLeakBaggageBetweenInvocations()
+    {
+        // Lambda reuses execution environments across invocations, so baggage extracted for one
+        // invocation must not be visible to a later one whose input carries none.
+        using (var tracerProvider = Sdk.CreateTracerProviderBuilder()
+                   .AddAWSLambdaConfigurations(opt =>
+                   {
+                       opt.SemanticConventionVersion = SemanticConventionVersion.Latest;
+                       opt.SetParentFromBatch = true;
+                   })
+                   .Build()!)
+        {
+            AWSLambdaWrapper.Trace(tracerProvider, this.sampleHandlers.SampleHandlerSyncSqsEventCapturingBaggage, CreateSqsEventWithBaggage("key1=value1,key2=value2"), this.sampleLambdaContext);
+            AssertBaggage(this.sampleHandlers.ObservedBaggage, "key1=value1", "key2=value2");
+
+            AWSLambdaWrapper.Trace(tracerProvider, this.sampleHandlers.SampleHandlerSyncSqsEventCapturingBaggage, new SQSEvent(), this.sampleLambdaContext);
+        }
+
+        Assert.NotNull(this.sampleHandlers.ObservedBaggage);
+        Assert.Empty(this.sampleHandlers.ObservedBaggage);
+    }
+
+    private static SQSEvent CreateSqsEventWithBaggage(string baggageValue) =>
+        new() { Records = [CreateSqsMessageWithBaggage(baggageValue)] };
+
+    private static SQSEvent.SQSMessage CreateSqsMessageWithBaggage(string baggageValue) =>
+        new()
+        {
+            MessageAttributes = new Dictionary<string, SQSEvent.MessageAttribute>
+            {
+                ["baggage"] = new SQSEvent.MessageAttribute { StringValue = baggageValue },
+            },
+        };
+
+    private static void AssertBaggage(IEnumerable<KeyValuePair<string, string>>? actual, params string[] expectedKeyValuePairs)
+    {
+        Assert.NotNull(actual);
+        Assert.Equal(expectedKeyValuePairs, actual.Select(kv => $"{kv.Key}={kv.Value}").OrderBy(s => s));
     }
 
     private static ActivityContext CreateParentContext()

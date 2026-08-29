@@ -168,7 +168,16 @@ public static class AWSLambdaWrapper
         IEnumerable<ActivityLink>? links = null;
         if (parentContext == default)
         {
-            (parentContext, links) = AWSLambdaUtils.ExtractParentContext(input);
+            (var propagationContext, links) = AWSLambdaUtils.ExtractParentContext(input);
+            parentContext = propagationContext.ActivityContext;
+
+            // Only replace the current baggage when the request carried some, so that baggage
+            // set by the caller is not discarded.
+            if (propagationContext.Baggage.Count > 0)
+            {
+                Baggage.Current = propagationContext.Baggage;
+            }
+
             if (parentContext == default && !DisableAwsXRayContextExtraction)
             {
                 parentContext = AWSLambdaUtils.GetXRayParentContext();
@@ -196,9 +205,12 @@ public static class AWSLambdaWrapper
             out var disableUrlQueryRedaction) &&
         disableUrlQueryRedaction;
 
-    private static void OnFunctionStop(Activity? activity, TracerProvider? tracerProvider)
+    private static void OnFunctionStop(Activity? activity, TracerProvider? tracerProvider, Baggage previousBaggage)
     {
         activity?.Stop();
+
+        // Restore the baggage, so it does not outlive the invocation in a reused environment.
+        Baggage.Current = previousBaggage;
 
         // force flush before function quit in case of Lambda freeze.
         tracerProvider?.ForceFlush();
@@ -225,6 +237,7 @@ public static class AWSLambdaWrapper
     {
         Guard.ThrowIfNull(context);
 
+        var previousBaggage = Baggage.Current;
         var activity = OnFunctionStart(input, context, parentContext);
         try
         {
@@ -240,7 +253,7 @@ public static class AWSLambdaWrapper
         }
         finally
         {
-            OnFunctionStop(activity, tracerProvider);
+            OnFunctionStop(activity, tracerProvider, previousBaggage);
         }
     }
 
@@ -253,6 +266,7 @@ public static class AWSLambdaWrapper
     {
         Guard.ThrowIfNull(context);
 
+        var previousBaggage = Baggage.Current;
         var activity = OnFunctionStart(input, context, parentContext);
         try
         {
@@ -268,7 +282,7 @@ public static class AWSLambdaWrapper
         }
         finally
         {
-            OnFunctionStop(activity, tracerProvider);
+            OnFunctionStop(activity, tracerProvider, previousBaggage);
         }
     }
 
