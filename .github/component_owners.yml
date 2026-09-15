@@ -89,6 +89,8 @@ components:
   src/OpenTelemetry.Resources.Process/:
     - Kielek
     - lachmatt
+  src/OpenTelemetry.Resources.Artifact/:
+    - ashishsinghnr
   src/OpenTelemetry.Resources.ProcessRuntime/:
     - Kielek
     - lachmatt
@@ -186,6 +188,8 @@ components:
   test/OpenTelemetry.Resources.Process.Tests/:
     - Kielek
     - lachmatt
+  test/OpenTelemetry.Resources.Artifact.Tests/:
+    - ashishsinghnr
   test/OpenTelemetry.Resources.ProcessRuntime.Tests/:
     - Kielek
     - lachmatt

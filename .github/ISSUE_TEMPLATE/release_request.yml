@@ -52,6 +52,7 @@ body:
         - OpenTelemetry.OpAmp.Client
         - OpenTelemetry.PersistentStorage.Abstractions
         - OpenTelemetry.PersistentStorage.FileSystem
+        - OpenTelemetry.Resources.Artifact
         - OpenTelemetry.Resources.AWS
         - OpenTelemetry.Resources.Azure
         - OpenTelemetry.Resources.Container

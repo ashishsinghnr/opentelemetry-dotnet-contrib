@@ -163,6 +163,8 @@ repository:
         comment: OpenTelemetry.PersistentStorage.Abstractions NuGet package distributed from NuGet.org.
       - uri: https://www.nuget.org/packages/OpenTelemetry.PersistentStorage.FileSystem
         comment: OpenTelemetry.PersistentStorage.FileSystem NuGet package distributed from NuGet.org.
+      - uri: https://www.nuget.org/packages/OpenTelemetry.Resources.Artifact
+        comment: OpenTelemetry.Resources.Artifact NuGet package distributed from NuGet.org.
       - uri: https://www.nuget.org/packages/OpenTelemetry.Resources.AWS
         comment: OpenTelemetry.Resources.AWS NuGet package distributed from NuGet.org.
       - uri: https://www.nuget.org/packages/OpenTelemetry.Resources.Azure

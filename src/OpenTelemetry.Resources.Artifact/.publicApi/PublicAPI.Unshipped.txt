@@ -1,0 +1,4 @@
+#nullable enable
+OpenTelemetry.Resources.ArtifactResourceBuilderExtensions
+static OpenTelemetry.Resources.ArtifactResourceBuilderExtensions.AddArtifactDetector(this OpenTelemetry.Resources.ResourceBuilder! builder) -> OpenTelemetry.Resources.ResourceBuilder!
+static OpenTelemetry.Resources.ArtifactResourceBuilderExtensions.AddArtifactDetector(this OpenTelemetry.Resources.ResourceBuilder! builder, System.Reflection.Assembly! assembly) -> OpenTelemetry.Resources.ResourceBuilder!

@@ -91,6 +91,7 @@ jobs:
           resources-aws: ['*/OpenTelemetry.Resources.AWS*/**', '!**/*.md']
           resources-azure: ['*/OpenTelemetry.Resources.Azure*/**', '!**/*.md']
           resources-container: ['*/OpenTelemetry.Resources.Container*/**', '!**/*.md']
+          resources-artifact: ['*/OpenTelemetry.Resources.Artifact/**', '*/OpenTelemetry.Resources.Artifact.Tests/**', '!**/*.md']
           resources-gcp: ['*/OpenTelemetry.Resources.Gcp*/**', '!**/*.md']
           resources-host: ['*/OpenTelemetry.Resources.Host*/**', '!**/*.md']
           resources-operatingsystem: ['*/OpenTelemetry.Resources.OperatingSystem/**', '*/OpenTelemetry.Resources.OperatingSystem.Tests/**', '!**/*.md']
@@ -553,6 +554,18 @@ jobs:
     with:
       project-name: OpenTelemetry.PersistentStorage
       code-cov-name: PersistentStorage
+      trigger: ${{ github.event_name }}
+
+  build-test-resources-artifact:
+    needs: detect-changes
+    if: |
+      contains(needs.detect-changes.outputs.changes, 'resources-artifact')
+      || contains(needs.detect-changes.outputs.changes, 'build')
+      || contains(needs.detect-changes.outputs.changes, 'shared')
+    uses: ./.github/workflows/Component.BuildTest.yml
+    with:
+      project-name: Component[OpenTelemetry.Resources.Artifact]
+      code-cov-name: Resources.Artifact
       trigger: ${{ github.event_name }}
 
   build-test-resources-aws:

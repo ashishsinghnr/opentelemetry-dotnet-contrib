@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- OmniSharp/VS Code requires TargetFrameworks to be in descending order for IntelliSense and analysis. -->
+    <!-- .NET Framework is not targeted: these tests exercise the dependency
+    manifest, which only .NET (Core) applications produce. -->
+    <TargetFrameworks>$(SupportedNetTargets)</TargetFrameworks>
+    <Description>Unit test project for the Artifact Resource Detector for OpenTelemetry.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(RepoRoot)\src\OpenTelemetry.Resources.Artifact\OpenTelemetry.Resources.Artifact.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -195,6 +195,11 @@ flags:
       - src/OpenTelemetry.PersistentStorage.Abstractions
       - src/OpenTelemetry.PersistentStorage.FileSystem
 
+  unittests-Resources.Artifact:
+    carryforward: true
+    paths:
+      - src/OpenTelemetry.Resources.Artifact
+
   unittests-Resources.AWS:
     carryforward: true
     paths:
