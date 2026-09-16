@@ -1,0 +1,11 @@
+#nullable enable
+OpenTelemetry.Instrumentation.DependencyInventory.DependencyInventoryOptions
+OpenTelemetry.Instrumentation.DependencyInventory.DependencyInventoryOptions.DependencyInventoryOptions() -> void
+OpenTelemetry.Instrumentation.DependencyInventory.DependencyInventoryOptions.Enabled.get -> bool
+OpenTelemetry.Instrumentation.DependencyInventory.DependencyInventoryOptions.Enabled.set -> void
+OpenTelemetry.Instrumentation.DependencyInventory.DependencyInventoryOptions.IncludeUnloadedPackages.get -> bool
+OpenTelemetry.Instrumentation.DependencyInventory.DependencyInventoryOptions.IncludeUnloadedPackages.set -> void
+OpenTelemetry.Instrumentation.DependencyInventory.DependencyInventoryOptions.MaxPackages.get -> int
+OpenTelemetry.Instrumentation.DependencyInventory.DependencyInventoryOptions.MaxPackages.set -> void
+OpenTelemetry.Instrumentation.DependencyInventory.DependencyInventoryReporter
+static OpenTelemetry.Instrumentation.DependencyInventory.DependencyInventoryReporter.Report(Microsoft.Extensions.Logging.ILoggerFactory! loggerFactory, OpenTelemetry.Instrumentation.DependencyInventory.DependencyInventoryOptions? options = null, System.Reflection.Assembly? assembly = null) -> int

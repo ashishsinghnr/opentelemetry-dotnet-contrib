@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- OmniSharp/VS Code requires TargetFrameworks to be in descending order for IntelliSense and analysis. -->
+    <!-- .NET Framework is not targeted: these tests exercise the dependency
+    manifest, which only .NET (Core) applications produce. -->
+    <TargetFrameworks>$(SupportedNetTargets)</TargetFrameworks>
+    <Description>Unit test project for the Dependency Inventory instrumentation for OpenTelemetry.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="OpenTelemetry.Exporter.InMemory" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(RepoRoot)\src\OpenTelemetry.Instrumentation.DependencyInventory\OpenTelemetry.Instrumentation.DependencyInventory.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -38,6 +38,8 @@ components:
     - xsoheilalizadeh
   src/OpenTelemetry.Instrumentation.ConfluentKafka/:
     - g7ed6e
+  src/OpenTelemetry.Instrumentation.DependencyInventory/:
+    - ashishsinghnr
   src/OpenTelemetry.Instrumentation.ElasticsearchClient/:
     - ejsmith
   src/OpenTelemetry.Instrumentation.EntityFrameworkCore/:
@@ -140,6 +142,8 @@ components:
     - xsoheilalizadeh
   test/OpenTelemetry.Instrumentation.ConfluentKafka.Tests/:
     - g7ed6e
+  test/OpenTelemetry.Instrumentation.DependencyInventory.Tests/:
+    - ashishsinghnr
   test/OpenTelemetry.Instrumentation.ElasticsearchClient.Tests/:
     - ejsmith
   test/OpenTelemetry.Instrumentation.EntityFrameworkCore.Tests/:

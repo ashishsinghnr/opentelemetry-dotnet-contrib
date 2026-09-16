@@ -69,6 +69,7 @@ jobs:
           instrumentation-aws: ['*/OpenTelemetry.Extensions.AWS*/**', '*/OpenTelemetry.Instrumentation.AWS*/**', '!**/*.md']
           instrumentation-cassandra: ['*/OpenTelemetry.Instrumentation.Cassandra*/**', '!**/*.md']
           instrumentation-confluentkafka: ['*/OpenTelemetry.Instrumentation.ConfluentKafka*/**', 'examples/kafka/**', '!**/*.md']
+          instrumentation-dependencyinventory: ['*/OpenTelemetry.Instrumentation.DependencyInventory*/**', '!**/*.md']
           instrumentation-elasticsearchclient: ['*/OpenTelemetry.Instrumentation.ElasticsearchClient*/**', '!**/*.md']
           instrumentation-entityframeworkcore: ['*/OpenTelemetry.Instrumentation.EntityFrameworkCore*/**', '*/OpenTelemetry.Instrumentation.SqlClient/**', '!**/*.md']
           instrumentation-eventcounters: ['*/OpenTelemetry.Instrumentation.EventCounters*/**', 'examples/event-counters/**', '!**/*.md']
@@ -320,6 +321,18 @@ jobs:
     with:
       project-name: Component[OpenTelemetry.Instrumentation.ConfluentKafka]
       code-cov-name: Instrumentation.ConfluentKafka
+      trigger: ${{ github.event_name }}
+
+  build-test-instrumentation-dependencyinventory:
+    needs: detect-changes
+    if: |
+      contains(needs.detect-changes.outputs.changes, 'instrumentation-dependencyinventory')
+      || contains(needs.detect-changes.outputs.changes, 'build')
+      || contains(needs.detect-changes.outputs.changes, 'shared')
+    uses: ./.github/workflows/Component.BuildTest.yml
+    with:
+      project-name: OpenTelemetry.Instrumentation.DependencyInventory
+      code-cov-name: Instrumentation.DependencyInventory
       trigger: ${{ github.event_name }}
 
   build-test-instrumentation-elasticsearchclient:
@@ -756,6 +769,7 @@ jobs:
       build-test-instrumentation-aws,
       build-test-instrumentation-cassandra,
       build-test-instrumentation-confluentkafka,
+      build-test-instrumentation-dependencyinventory,
       build-test-instrumentation-elasticsearchclient,
       build-test-instrumentation-entityframeworkcore,
       build-test-instrumentation-eventcounters,
