@@ -21,6 +21,12 @@ attributes](https://github.com/open-telemetry/semantic-conventions/blob/v1.44.0/
 align with the [SLSA package
 model](https://slsa.dev/spec/v1.0/terminology#package-model).
 
+Because these are resource attributes, they are attached to every span, metric,
+and log record the provider exports. Telemetry can therefore be filtered and
+grouped by build: during a canary or blue-green rollout two versions run under
+the same `service.name`, and `artifact.version` is what separates their metrics
+so a regression can be attributed to the build that introduced it.
+
 ## Getting Started
 
 You need to install the `OpenTelemetry.Resources.Artifact` package to be able
@@ -85,13 +91,15 @@ model.
 The detector derives its attributes from the entry assembly and records the
 following metadata:
 
-- **ArtifactDetector**: `artifact.filename`, `artifact.version`, and, when it
-  can be determined, `artifact.purl`.
+- **ArtifactDetector**: `artifact.filename`, and, when each can be determined,
+  `artifact.version` and `artifact.purl`.
 
 `artifact.version` is taken from the assembly's informational version, which
 carries the full package version including any prerelease label. Any Source
 Link commit suffix (the `+<commit sha>` portion) is removed. When no
-informational version is present, the assembly version is used instead.
+informational version is present, the assembly version is used instead. When
+the assembly records neither, `artifact.version` is omitted and
+`artifact.filename` is still reported.
 
 ### Package URL
 
@@ -111,10 +119,14 @@ and `artifact.version` are still reported.
   `artifact.filename` and `artifact.version` are unaffected. A diagnostic is
   written to the event source, which also covers the case of an assembly loaded
   by a host: see [Applications loaded by a host](#applications-loaded-by-a-host).
+- A manifest that cannot be read or parsed is treated the same way: the failure
+  is written to the event source, `artifact.purl` is omitted, and the remaining
+  attributes are still reported. Detection never fails the provider being built.
 - On .NET Framework there is no `.deps.json` manifest, so `artifact.purl` is
   never reported.
-- No attributes are reported when there is no entry assembly, which is the case
-  for some hosts that load managed code through unmanaged entry points.
+- No attributes are reported when there is no entry assembly, or when it has no
+  name. The first is the case for some hosts that load managed code through
+  unmanaged entry points.
 
 ## References
 

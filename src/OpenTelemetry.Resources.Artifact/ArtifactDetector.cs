@@ -2,9 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 using System.Reflection;
-#if NET
-using System.Text.Json;
-#endif
 using OpenTelemetry.Internal;
 
 namespace OpenTelemetry.Resources.Artifact;
@@ -13,11 +10,9 @@ namespace OpenTelemetry.Resources.Artifact;
 /// Detector for the build artifact of the running application.
 /// </summary>
 /// <remarks>
-/// Attributes are derived from the entry assembly unless another is given. The
-/// Package URL is only reported when that assembly can be matched to a package
-/// in its <c>.deps.json</c> manifest; a Package URL is never synthesized,
-/// because an identifier that does not correspond to a published package cannot
-/// be resolved by consumers.
+/// Attributes come from the entry assembly unless another is given. A Package URL
+/// is reported only on a match in the <c>.deps.json</c> manifest, never
+/// synthesized, since an unpublished identifier cannot be resolved.
 /// </remarks>
 internal sealed class ArtifactDetector : IResourceDetector
 {
@@ -49,7 +44,10 @@ internal sealed class ArtifactDetector : IResourceDetector
     /// <summary>
     /// Detects the resource attributes describing the application's build artifact.
     /// </summary>
-    /// <returns>Resource with key-value pairs of resource attributes.</returns>
+    /// <returns>
+    /// Resource with key-value pairs of resource attributes, or
+    /// <see cref="Resource.Empty"/> when the assembly cannot be named.
+    /// </returns>
     public Resource Detect()
     {
         var entryAssembly = this.assembly ?? Assembly.GetEntryAssembly();
@@ -64,22 +62,24 @@ internal sealed class ArtifactDetector : IResourceDetector
             return Resource.Empty;
         }
 
-        if (GetVersion(entryAssembly, assemblyName) is not { Length: > 0 } version)
-        {
-            return Resource.Empty;
-        }
-
         var attributes = new List<KeyValuePair<string, object>>(3)
         {
             new(ArtifactSemanticConventions.AttributeArtifactFilename, simpleName),
-            new(ArtifactSemanticConventions.AttributeArtifactVersion, version),
         };
 
+        // Each attribute is optional, so an assembly with no recorded version is
+        // still reported with its name.
+        if (GetVersion(entryAssembly, assemblyName) is { Length: > 0 } version)
+        {
+            attributes.Add(new(
+                ArtifactSemanticConventions.AttributeArtifactVersion,
+                version));
+        }
+
+        // artifact.purl identifies the package that shipped the assembly, whose
+        // name often differs: Humanizer.Core ships Humanizer.dll. Requires the
+        // .deps.json manifest, which only .NET (Core) produces.
 #if NET
-        // The Package URL names the package that supplied the entry assembly,
-        // which is not necessarily the assembly's own name. There is no
-        // dependency manifest on .NET Framework or .NET Standard, so no Package
-        // URL can be determined there.
         var package = FindPackageSupplying(entryAssembly, simpleName);
         if (package != null)
         {
@@ -94,18 +94,15 @@ internal sealed class ArtifactDetector : IResourceDetector
 
     /// <summary>
     /// Resolves the artifact version, preferring the informational version
-    /// recorded at build time because it carries the full package version
-    /// (including any prerelease label), which the assembly version does not.
+    /// because it carries any prerelease label that the assembly version drops.
     /// </summary>
     /// <param name="assembly">The entry assembly.</param>
     /// <param name="assemblyName">The entry assembly's name.</param>
     /// <returns>The version, or <see langword="null"/> when none is recorded.</returns>
     private static string? GetVersion(Assembly assembly, AssemblyName assemblyName)
     {
-        // The informational version is only read through the shared helper when
-        // one is present. Unlike the instrumentation assemblies that helper was
-        // written for, an arbitrary application need not carry the attribute,
-        // and the helper asserts that it does.
+        // Presence is checked here because GetPackageVersion assumes the
+        // attribute exists, which an arbitrary application need not carry.
         var hasInformationalVersion = assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
             .InformationalVersion is { Length: > 0 };
@@ -117,12 +114,14 @@ internal sealed class ArtifactDetector : IResourceDetector
 
 #if NET
     /// <summary>
-    /// Finds the package that supplied the entry assembly, or returns
-    /// <see langword="null"/> when it was not supplied by a package.
+    /// Finds the package that supplied the entry assembly.
     /// </summary>
     /// <param name="assembly">The assembly being described.</param>
     /// <param name="assemblyName">The simple name of that assembly.</param>
-    /// <returns>The package, or <see langword="null"/>.</returns>
+    /// <returns>
+    /// The package, or <see langword="null"/> when no package supplied the
+    /// assembly or the manifest could not be read.
+    /// </returns>
     private static DepsManifestPackage? FindPackageSupplying(Assembly assembly, string assemblyName)
     {
         try
@@ -130,10 +129,8 @@ internal sealed class ArtifactDetector : IResourceDetector
             var manifestPath = DepsManifest.FindPath(assembly);
             if (manifestPath == null)
             {
-                // No manifest could be found for this assembly. That is expected
-                // for a single-file or Native AOT publish, but it is also what
-                // happens when the assembly being described is a platform host
-                // rather than the application, so it is worth surfacing.
+                // A missing manifest is expected for single-file and Native AOT,
+                // but is also how a platform host looks, so it is surfaced.
                 ArtifactDetectorEventSource.Log.NoManifestBesideAssembly(assemblyName);
                 return null;
             }
@@ -141,10 +138,10 @@ internal sealed class ArtifactDetector : IResourceDetector
             using var stream = File.OpenRead(manifestPath);
             return DepsManifest.ReadPackageSupplying(stream, assemblyName);
         }
-        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        catch (Exception ex)
         {
-            // The manifest is absent (single-file publish, Native AOT) or
-            // unreadable. The Package URL is optional, so degrade quietly.
+            // The Package URL is optional, so degrade quietly rather than
+            // failing the provider being built.
             ArtifactDetectorEventSource.Log.FailedToReadDepsManifest(ex.Message);
             return null;
         }

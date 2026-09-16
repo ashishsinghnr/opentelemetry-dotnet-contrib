@@ -7,11 +7,8 @@ namespace OpenTelemetry.Resources.Artifact;
 /// Attribute names from the <c>artifact.*</c> registry group.
 /// </summary>
 /// <remarks>
-/// These names are also generated into the <c>OpenTelemetry.SemanticConventions</c>
-/// package. They are declared locally instead of taken from there, because that
-/// package is versioned and released independently and no component in this
-/// repository depends on it; every resource detector here declares the names it
-/// uses. The duplication is deliberate.
+/// Declared locally, as every detector here does, rather than taken from the
+/// independently versioned <c>OpenTelemetry.SemanticConventions</c> package.
 /// </remarks>
 internal static class ArtifactSemanticConventions
 {

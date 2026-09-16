@@ -14,33 +14,19 @@ namespace OpenTelemetry.Internal;
 /// packages that supplied the assemblies deployed with the application.
 /// </summary>
 /// <remarks>
-/// The manifest is only produced for .NET (Core) applications. On .NET
-/// Framework and .NET Standard there is no manifest, so every member reports
-/// that nothing could be resolved.
+/// Only .NET (Core) produces a manifest, so on .NET Framework and .NET Standard
+/// <see cref="FindPath"/> finds nothing and the reading members are not compiled.
 /// </remarks>
 internal static class DepsManifest
 {
-    /// <summary>
-    /// Gets a value indicating whether the current runtime produces a
-    /// <c>.deps.json</c> manifest at all.
-    /// </summary>
-    internal static bool IsSupported =>
-#if NET
-        true;
-#else
-        false;
-#endif
-
     /// <summary>
     /// Locates the manifest belonging to the given assembly.
     /// </summary>
     /// <param name="assembly">The assembly whose manifest is wanted.</param>
     /// <returns>The manifest path, or <see langword="null"/> when absent.</returns>
     /// <remarks>
-    /// The assembly's own directory is searched before the application's, so that
-    /// an assembly loaded from elsewhere by a host resolves to its own manifest
-    /// rather than the host's. This is the case for a serverless function loaded
-    /// as a library, where the entry assembly is the platform's runtime host.
+    /// The assembly's own directory is searched first, so an assembly loaded by a
+    /// host resolves to its own manifest rather than the host's.
     /// </remarks>
     internal static string? FindPath(Assembly assembly)
     {
@@ -53,8 +39,8 @@ internal static class DepsManifest
 
         var expectedFileName = assemblyName + ".deps.json";
 
-        // The assembly's own directory is authoritative when it is known. A
-        // single-file or in-memory assembly reports an empty Location.
+        // The assembly's own directory wins when known; a single-file or dynamic
+        // assembly reports no location.
         var assemblyDirectory = GetAssemblyDirectory(assembly);
         if (assemblyDirectory != null)
         {
@@ -65,9 +51,7 @@ internal static class DepsManifest
             }
         }
 
-        // The host records every manifest in use, which includes the shared
-        // framework's as well as the application's. Match on the assembly's name
-        // so that its manifest is selected rather than whichever is listed first.
+        // The host lists the framework's manifests too, so match on name.
         if (AppContext.GetData("APP_CONTEXT_DEPS_FILES") is string depsFiles
             && depsFiles.Length > 0)
         {
@@ -85,9 +69,8 @@ internal static class DepsManifest
             }
         }
 
-        // Fall back to the application's output directory. The assembly's name is
-        // used rather than the process name, because the process is the shared
-        // host ("dotnet") when the application is launched through it.
+        // Fall back to the output directory, keyed on the assembly name because
+        // the process may be the shared host ("dotnet").
         var baseDirectory = AppContext.BaseDirectory;
         if (string.IsNullOrEmpty(baseDirectory))
         {
@@ -108,15 +91,10 @@ internal static class DepsManifest
     /// </summary>
     /// <param name="manifest">The <c>.deps.json</c> manifest to read.</param>
     /// <param name="assemblyName">The simple name of the assembly to resolve.</param>
-    /// <returns>
-    /// The package, or <see langword="null"/> when the assembly was not supplied
-    /// by a package.
-    /// </returns>
+    /// <returns>The package, or <see langword="null"/> when there is no match.</returns>
     /// <remarks>
-    /// The package's own identifier is returned rather than the assembly name,
-    /// because the two routinely differ: <c>Humanizer.Core</c> ships
-    /// <c>Humanizer.dll</c>. Only the manifest's identifier corresponds to a
-    /// published package.
+    /// The package identifier is returned, not the assembly name: the two often
+    /// differ (<c>Humanizer.Core</c> ships <c>Humanizer.dll</c>).
     /// </remarks>
     internal static DepsManifestPackage? ReadPackageSupplying(Stream manifest, string assemblyName)
     {
@@ -126,7 +104,8 @@ internal static class DepsManifest
         {
             foreach (var library in target.EnumerateObject())
             {
-                if (!SuppliesAssembly(library.Value, assemblyName)
+                if (library.Value.ValueKind != JsonValueKind.Object
+                    || !SuppliesAssembly(library.Value, assemblyName)
                     || !TrySplitLibraryKey(library.Name, out var name, out var version)
                     || !IsPackage(document.RootElement, library.Name))
                 {
@@ -144,53 +123,17 @@ internal static class DepsManifest
     }
 
     /// <summary>
-    /// Enumerates every package recorded in the manifest.
-    /// </summary>
-    /// <param name="manifest">The <c>.deps.json</c> manifest to read.</param>
-    /// <returns>
-    /// The name, version, and supplied assemblies of each package. Project
-    /// output is excluded, because it has no published identity.
-    /// </returns>
-    internal static List<DepsManifestPackage> ReadPackages(Stream manifest)
-    {
-        using var document = JsonDocument.Parse(manifest);
-
-        var packages = new List<DepsManifestPackage>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var target in EnumerateTargets(document))
-        {
-            foreach (var library in target.EnumerateObject())
-            {
-                if (!TrySplitLibraryKey(library.Name, out var name, out var version)
-                    || !IsPackage(document.RootElement, library.Name)
-                    || !seen.Add(library.Name))
-                {
-                    continue;
-                }
-
-                packages.Add(new DepsManifestPackage(
-                    name,
-                    version,
-                    ReadRuntimeAssemblies(library.Value)));
-            }
-        }
-
-        return packages;
-    }
-
-    /// <summary>
     /// Gets the directory an assembly was loaded from.
     /// </summary>
     /// <param name="assembly">The assembly to locate.</param>
     /// <returns>
-    /// The directory, or <see langword="null"/> when the assembly has no file on
-    /// disk, which is the case for a single-file publish or a dynamic assembly.
+    /// The directory, or <see langword="null"/> when it cannot be determined: a
+    /// dynamic assembly, a single-file publish, or an unreadable path.
     /// </returns>
     [UnconditionalSuppressMessage(
         "SingleFile",
         "IL3000:Avoid accessing Assembly file path when publishing as a single file",
-        Justification = "An empty location is the documented result for an assembly with no file on disk, and is handled by returning null so that the caller falls back to its other probes. The application's base directory is deliberately not substituted, because it is the wrong directory for an assembly loaded by a host.")]
+        Justification = "An empty location is expected here and returns null so the caller falls back to its other probes. The base directory is not substituted, being wrong for an assembly loaded by a host.")]
     private static string? GetAssemblyDirectory(Assembly assembly)
     {
         if (assembly.IsDynamic)
@@ -213,7 +156,10 @@ internal static class DepsManifest
     {
         var targets = new List<JsonElement>();
 
-        if (!document.RootElement.TryGetProperty("targets", out var targetsElement)
+        // The root is kind-checked too: a manifest whose root is an array or a
+        // scalar is valid JSON, and TryGetProperty throws on anything but object.
+        if (document.RootElement.ValueKind != JsonValueKind.Object
+            || !document.RootElement.TryGetProperty("targets", out var targetsElement)
             || targetsElement.ValueKind != JsonValueKind.Object)
         {
             return targets;
@@ -234,7 +180,8 @@ internal static class DepsManifest
     {
         var assemblies = new List<string>();
 
-        if (!library.TryGetProperty("runtime", out var runtime)
+        if (library.ValueKind != JsonValueKind.Object
+            || !library.TryGetProperty("runtime", out var runtime)
             || runtime.ValueKind != JsonValueKind.Object)
         {
             return assemblies;
@@ -242,10 +189,15 @@ internal static class DepsManifest
 
         foreach (var asset in runtime.EnumerateObject())
         {
-            // Asset paths look like "lib/net8.0/Foo.dll". A placeholder entry
-            // ("_._") marks a framework that intentionally ships nothing.
+            // Asset paths look like "lib/net8.0/Foo.dll". "_._" is a placeholder
+            // for shipping nothing; matched whole so a real "_.dll" is kept.
+            if (Path.GetFileName(asset.Name) == "_._")
+            {
+                continue;
+            }
+
             var fileName = Path.GetFileNameWithoutExtension(asset.Name);
-            if (fileName.Length > 0 && fileName != "_")
+            if (fileName.Length > 0)
             {
                 assemblies.Add(fileName);
             }
@@ -291,9 +243,15 @@ internal static class DepsManifest
 
     private static bool IsPackage(JsonElement root, string libraryKey)
     {
-        if (!root.TryGetProperty("libraries", out var libraries)
+        // Every level is kind-checked before it is read, so a malformed manifest
+        // reports "not a package" instead of throwing.
+        if (root.ValueKind != JsonValueKind.Object
+            || !root.TryGetProperty("libraries", out var libraries)
+            || libraries.ValueKind != JsonValueKind.Object
             || !libraries.TryGetProperty(libraryKey, out var library)
-            || !library.TryGetProperty("type", out var type))
+            || library.ValueKind != JsonValueKind.Object
+            || !library.TryGetProperty("type", out var type)
+            || type.ValueKind != JsonValueKind.String)
         {
             return false;
         }

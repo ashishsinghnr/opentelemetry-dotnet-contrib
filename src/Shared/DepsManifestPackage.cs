@@ -21,12 +21,9 @@ internal sealed class DepsManifestPackage
     public string Name { get; }
 
     /// <summary>
-    /// Gets the package version, for example <c>13.0.3</c>.
+    /// Gets the package version, for example <c>13.0.3</c>. This often differs
+    /// from the version of the assemblies the package ships.
     /// </summary>
-    /// <remarks>
-    /// This is the package version, which routinely differs from the version of
-    /// the assemblies the package ships.
-    /// </remarks>
     public string Version { get; }
 
     /// <summary>

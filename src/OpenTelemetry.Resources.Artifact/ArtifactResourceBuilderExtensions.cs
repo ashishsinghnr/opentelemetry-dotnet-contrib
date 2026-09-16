@@ -30,10 +30,9 @@ public static class ArtifactResourceBuilderExtensions
     /// <param name="assembly">The assembly to describe.</param>
     /// <returns>The instance of <see cref="ResourceBuilder"/> being configured.</returns>
     /// <remarks>
-    /// Use this when the application is loaded as a library by a host, so that the
-    /// host is the entry assembly. A serverless function deployed as a class
-    /// library is the common case: pass the assembly containing the function so
-    /// that the function is described rather than the platform's runtime host.
+    /// Use this when a host loads the application as a library and so is itself
+    /// the entry assembly, as for a serverless function deployed as a class
+    /// library. Pass the function's assembly to describe it rather than the host.
     /// </remarks>
     public static ResourceBuilder AddArtifactDetector(this ResourceBuilder builder, Assembly assembly)
     {

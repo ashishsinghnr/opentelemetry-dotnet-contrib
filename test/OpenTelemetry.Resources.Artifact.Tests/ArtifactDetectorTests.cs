@@ -1,9 +1,11 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
+using System.Diagnostics;
 using System.Reflection;
 using System.Text;
 using OpenTelemetry.Internal;
+using OpenTelemetry.Trace;
 
 namespace OpenTelemetry.Resources.Artifact.Tests;
 
@@ -52,11 +54,8 @@ public class ArtifactDetectorTests
     [Fact]
     public void ArtifactPurlIdentifiesThePackageThatSuppliedTheAssembly()
     {
-        // This test project is built here rather than restored as a package, so
-        // its own output has no published identity and no Package URL may be
-        // derived from it. Reporting one would mean an identifier that resolves
-        // to nothing, which a vulnerability database reads as "no known
-        // vulnerabilities" rather than as an error.
+        // This project is built, not restored as a package, so its output has no
+        // published identity and no Package URL may be derived from it.
         var resource = ResourceBuilder.CreateEmpty()
             .AddArtifactDetector(typeof(ArtifactDetectorTests).Assembly)
             .Build();
@@ -109,10 +108,8 @@ public class ArtifactDetectorTests
     [Fact]
     public void GivenAssemblyIsDescribedInsteadOfTheEntryAssembly()
     {
-        // A host that loads the application as a library is the entry assembly,
-        // so a serverless function deployed as a class library must be able to
-        // name itself. This test's own assembly stands in for that function: it
-        // is not the entry assembly under a test host.
+        // Under a test host this assembly is not the entry assembly, so it stands
+        // in for a serverless function that must name itself.
         var ownAssembly = typeof(ArtifactDetectorTests).Assembly;
         var entryAssembly = Assembly.GetEntryAssembly();
 
@@ -144,11 +141,8 @@ public class ArtifactDetectorTests
     [Fact]
     public void PackageUrlNamesThePackageNotTheAssembly()
     {
-        // A package's identifier routinely differs from the name of the
-        // assembly it ships: Humanizer.Core ships Humanizer.dll. Deriving the
-        // Package URL from the assembly name would name a package that does not
-        // exist, which resolves to nothing in a vulnerability database and so
-        // reads as "no known vulnerabilities" rather than as an error.
+        // Humanizer.Core ships Humanizer.dll. Using the assembly name would name
+        // a package that does not exist.
         const string Manifest = """
         {
           "targets": {
@@ -174,10 +168,8 @@ public class ArtifactDetectorTests
     [Fact]
     public void PackageVersionComesFromLibraryKeyNotAssemblyVersion()
     {
-        // A package's assembly version routinely differs from its package
-        // version: Newtonsoft.Json 13.0.3 ships assembly version 13.0.0.0. The
-        // package version is the one a Package URL must carry, so it is taken
-        // from the library key rather than the runtime asset's metadata.
+        // Newtonsoft.Json 13.0.3 ships assembly version 13.0.0.0. A Package URL
+        // must carry the package version, so it comes from the library key.
         const string Manifest = """
         {
           "targets": {
@@ -204,9 +196,8 @@ public class ArtifactDetectorTests
     [Fact]
     public void ProjectOutputIsNotTreatedAsAPackage()
     {
-        // The application's own output appears in the manifest with type
-        // "project". It has no published identity, so no Package URL may be
-        // derived from it.
+        // The application's own output has type "project" and no published
+        // identity, so no Package URL may be derived from it.
         const string Manifest = """
         {
           "targets": {
@@ -228,9 +219,8 @@ public class ArtifactDetectorTests
     [Fact]
     public void PackageIsFoundWhenProjectOutputSuppliesTheSameAssemblyName()
     {
-        // Project output is enumerated first in a real manifest. Rejecting it
-        // must not abandon the search, or a genuine package match that appears
-        // later would be missed.
+        // Project output comes first in a real manifest, so rejecting it must not
+        // abandon the search for a later package match.
         const string Manifest = """
         {
           "targets": {
@@ -277,8 +267,8 @@ public class ArtifactDetectorTests
     [Fact]
     public void ReferenceOnlyLibraryIsIgnored()
     {
-        // A library that contributes no runtime assets did not supply the
-        // assembly, even when the names coincide.
+        // A library with no runtime assets did not supply the assembly, even when
+        // the names coincide.
         const string Manifest = """
         {
           "targets": {
@@ -319,11 +309,118 @@ public class ArtifactDetectorTests
     }
 
     [Fact]
-    public void MalformedManifestIsNotResolved()
+    public void PlaceholderAssetIsIgnoredButRealUnderscoreAssemblyIsKept()
     {
-        Assert.Null(ReadPackageVersion("{}", "MyApp"));
-        Assert.Null(ReadPackageVersion("""{ "targets": null }""", "MyApp"));
-        Assert.Null(ReadPackageVersion("""{ "targets": { ".NETCoreApp,Version=v8.0": null } }""", "MyApp"));
+        // "_._" is a placeholder for shipping nothing, matched on the whole file
+        // name so a real "_.dll" is still reported.
+        const string Manifest = """
+        {
+          "targets": {
+            ".NETCoreApp,Version=v8.0": {
+              "Empty.Package/1.0.0": {
+                "runtime": { "lib/net8.0/_._": {} }
+              },
+              "Underscore.Package/2.0.0": {
+                "runtime": { "lib/net8.0/_.dll": {} }
+              }
+            }
+          },
+          "libraries": {
+            "Empty.Package/1.0.0": { "type": "package" },
+            "Underscore.Package/2.0.0": { "type": "package" }
+          }
+        }
+        """;
+
+        Assert.Equal("2.0.0", ReadPackageVersion(Manifest, "_"));
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("[]")]
+    [InlineData("null")]
+    [InlineData("42")]
+    [InlineData("\"notanobject\"")]
+    [InlineData("""{ "targets": null }""")]
+    [InlineData("""{ "targets": { ".NETCoreApp,Version=v8.0": null } }""")]
+    [InlineData("""{ "targets": { ".NETCoreApp,Version=v8.0": { "MyApp/1.0": "notanobject" } } }""")]
+    [InlineData("""{ "targets": { ".NETCoreApp,Version=v8.0": { "MyApp/1.0": { "runtime": null } } } }""")]
+    [InlineData("""{ "targets": { ".NETCoreApp,Version=v8.0": { "MyApp/1.0": { "runtime": { "MyApp.dll": {} } } } }, "libraries": null }""")]
+    [InlineData("""{ "targets": { ".NETCoreApp,Version=v8.0": { "MyApp/1.0": { "runtime": { "MyApp.dll": {} } } } }, "libraries": { "MyApp/1.0": null } }""")]
+    [InlineData("""{ "targets": { ".NETCoreApp,Version=v8.0": { "MyApp/1.0": { "runtime": { "MyApp.dll": {} } } } }, "libraries": { "MyApp/1.0": { "type": 5 } } }""")]
+    [InlineData("""{ "targets": { ".NETCoreApp,Version=v8.0": { "MyApp" : { "runtime": { "MyApp.dll": {} } } } }, "libraries": { "MyApp": { "type": "package" } } }""")]
+    public void MalformedManifestIsNotResolved(string manifest)
+    {
+        // Must resolve nothing rather than throw: an exception here would escape
+        // Detect and fail provider construction.
+        Assert.Null(ReadPackageVersion(manifest, "MyApp"));
+    }
+
+    [Fact]
+    public void DetectDoesNotThrowWhenTheManifestIsMalformed()
+    {
+        // A corrupt manifest must not stop the application starting.
+        var directory = Directory.CreateTempSubdirectory("ArtifactDetectorTests");
+
+        try
+        {
+            var assembly = typeof(ArtifactDetectorTests).Assembly;
+            var manifestPath = Path.Combine(
+                directory.FullName,
+                assembly.GetName().Name + ".deps.json");
+
+            File.WriteAllText(manifestPath, """{ "targets": { "net8.0": { "A/1.0": "bad" } } }""");
+
+            var resource = ResourceBuilder.CreateEmpty()
+                .AddArtifactDetector(assembly)
+                .Build();
+
+            // The name is still reported; only the Package URL is lost.
+            var resourceAttributes = resource.Attributes.ToDictionary(x => x.Key, x => x.Value);
+
+            Assert.Equal(
+                assembly.GetName().Name,
+                resourceAttributes[ArtifactSemanticConventions.AttributeArtifactFilename]);
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
+    public void DetectedAttributesReachExportedTelemetry()
+    {
+        // Exercises the detector through a real provider and exporter, rather than
+        // alone, so a failure to run inside the pipeline is caught.
+        const string SourceName = "ArtifactDetectorTests.EndToEnd";
+
+        var exportedItems = new List<Activity>();
+
+        using var tracerProvider = Sdk.CreateTracerProviderBuilder()
+            .ConfigureResource(resource => resource.AddArtifactDetector())
+            .AddSource(SourceName)
+            .AddInMemoryExporter(exportedItems)
+            .Build();
+
+        using var source = new ActivitySource(SourceName);
+        using (var activity = source.StartActivity("Test"))
+        {
+            Assert.NotNull(activity);
+        }
+
+        tracerProvider.ForceFlush();
+
+        // The span reached the exporter, so the resource is the one that provider
+        // built and attaches to its telemetry.
+        Assert.Single(exportedItems);
+
+        var resourceAttributes = tracerProvider.GetResource().Attributes
+            .ToDictionary(x => x.Key, x => x.Value);
+
+        var filename = Assert.IsType<string>(
+            resourceAttributes[ArtifactSemanticConventions.AttributeArtifactFilename]);
+        Assert.NotEmpty(filename);
     }
 
     private static DepsManifestPackage? ReadPackage(string manifest, string assemblyName)
