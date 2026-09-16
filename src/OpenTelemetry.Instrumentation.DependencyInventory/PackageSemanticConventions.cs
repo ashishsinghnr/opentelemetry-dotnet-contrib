@@ -15,9 +15,14 @@ namespace OpenTelemetry.Instrumentation.DependencyInventory;
 /// </remarks>
 internal static class PackageSemanticConventions
 {
-    public const string EventName = "package.dependency";
+    // Matches the event name and package.* attributes that
+    // opentelemetry-java-instrumentation emits from its jar analyzer, so that a
+    // backend can read both runtimes with one rule.
+    public const string EventName = "package.info";
 
     public const string AttributeEventName = "event.name";
+    public const string AttributePackageChecksum = "package.checksum";
+    public const string AttributePackageChecksumAlgorithm = "package.checksum_algorithm";
     public const string AttributePackageLoaded = "package.loaded";
     public const string AttributePackageName = "package.name";
     public const string AttributePackagePurl = "package.purl";

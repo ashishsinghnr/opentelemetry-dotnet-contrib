@@ -24,7 +24,7 @@ internal static class DependencyRecord
         // The provider maps these pairs onto log record attributes. No
         // "{OriginalFormat}" entry is included, because only some exporters strip
         // it and the rest would export it.
-        var state = new List<KeyValuePair<string, object?>>(6)
+        var state = new List<KeyValuePair<string, object?>>(8)
         {
             new(PackageSemanticConventions.AttributeEventName, PackageSemanticConventions.EventName),
             new(PackageSemanticConventions.AttributePackagePurl, package.Purl),
@@ -33,6 +33,16 @@ internal static class DependencyRecord
             new(PackageSemanticConventions.AttributePackageType, PackageSemanticConventions.PackageTypeNuGet),
             new(PackageSemanticConventions.AttributePackageLoaded, isLoaded),
         };
+
+        // The checksum verifies the package against the one published, and is
+        // omitted rather than reported empty when the manifest records none.
+        if (package.Checksum != null && package.ChecksumAlgorithm != null)
+        {
+            state.Add(new(PackageSemanticConventions.AttributePackageChecksum, package.Checksum));
+            state.Add(new(
+                PackageSemanticConventions.AttributePackageChecksumAlgorithm,
+                package.ChecksumAlgorithm));
+        }
 
         logger.Log(
             LogLevel.Information,

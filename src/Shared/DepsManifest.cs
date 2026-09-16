@@ -111,7 +111,7 @@ internal static class DepsManifest
             {
                 if (library.Value.ValueKind != JsonValueKind.Object
                     || !TrySplitLibraryKey(library.Name, out var name, out var version)
-                    || !IsPackage(document.RootElement, library.Name)
+                    || !IsPackage(document.RootElement, library.Name, out var entry)
                     || !seen.Add(library.Name))
                 {
                     continue;
@@ -120,7 +120,9 @@ internal static class DepsManifest
                 packages.Add(new DepsManifestPackage(
                     name,
                     version,
-                    ReadRuntimeAssemblies(library.Value)));
+                    ReadRuntimeAssemblies(library.Value),
+                    ReadChecksum(entry, out var algorithm),
+                    algorithm));
             }
         }
 
@@ -262,22 +264,62 @@ internal static class DepsManifest
         return true;
     }
 
-    private static bool IsPackage(JsonElement root, string libraryKey)
+    /// <summary>
+    /// Determines whether a library is a published package, and hands back its
+    /// entry so the caller can read the rest of it.
+    /// </summary>
+    /// <param name="root">The manifest's root element.</param>
+    /// <param name="libraryKey">The library key to look up.</param>
+    /// <param name="library">The library's entry, when it is a package.</param>
+    /// <returns><see langword="true"/> when the library is a package.</returns>
+    private static bool IsPackage(JsonElement root, string libraryKey, out JsonElement library)
     {
+        library = default;
+
         // Every level is kind-checked before it is read, so a malformed manifest
         // reports "not a package" instead of throwing.
         if (root.ValueKind != JsonValueKind.Object
             || !root.TryGetProperty("libraries", out var libraries)
             || libraries.ValueKind != JsonValueKind.Object
-            || !libraries.TryGetProperty(libraryKey, out var library)
-            || library.ValueKind != JsonValueKind.Object
-            || !library.TryGetProperty("type", out var type)
+            || !libraries.TryGetProperty(libraryKey, out var entry)
+            || entry.ValueKind != JsonValueKind.Object
+            || !entry.TryGetProperty("type", out var type)
             || type.ValueKind != JsonValueKind.String)
         {
             return false;
         }
 
+        library = entry;
         return string.Equals(type.GetString(), "package", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Reads a package's content hash, which NuGet records algorithm-prefixed as
+    /// <c>"sha512-&lt;base64&gt;"</c>.
+    /// </summary>
+    /// <param name="library">The library's entry in <c>libraries</c>.</param>
+    /// <param name="algorithm">The hash algorithm, or null.</param>
+    /// <returns>The hash, or <see langword="null"/> when none is recorded.</returns>
+    private static string? ReadChecksum(JsonElement library, out string? algorithm)
+    {
+        algorithm = null;
+
+        if (!library.TryGetProperty("sha512", out var hash)
+            || hash.ValueKind != JsonValueKind.String
+            || hash.GetString() is not { Length: > 0 } value)
+        {
+            return null;
+        }
+
+        var separatorIndex = value.IndexOf('-', StringComparison.Ordinal);
+        if (separatorIndex <= 0 || separatorIndex == value.Length - 1)
+        {
+            // Unprefixed values are not assumed to be any particular algorithm.
+            return null;
+        }
+
+        algorithm = value.Substring(0, separatorIndex);
+        return value.Substring(separatorIndex + 1);
     }
 #endif
 }

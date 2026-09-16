@@ -54,6 +54,34 @@ public class DependencyInventoryReporterTests
     }
 
     [Fact]
+    public void ReportedRecordsCarryTheirPackageChecksum()
+    {
+        DependencyInventoryReporter.ResetForTesting();
+
+        var exported = new List<LogRecord>();
+        using var loggerFactory = CreateLoggerFactory(exported);
+
+        DependencyInventoryReporter.Report(loggerFactory, options: null, assembly: TestAssembly);
+
+        // Restored packages carry a hash in the manifest, so the records for this
+        // project's own dependencies report one.
+        var attributes = exported
+            .Select(r => r.Attributes!.ToDictionary(a => a.Key, a => a.Value))
+            .Where(a => a.ContainsKey(PackageSemanticConventions.AttributePackageChecksum))
+            .ToList();
+
+        Assert.NotEmpty(attributes);
+
+        Assert.All(attributes, a =>
+        {
+            Assert.NotEmpty(Assert.IsType<string>(a[PackageSemanticConventions.AttributePackageChecksum]));
+            Assert.Equal(
+                "sha512",
+                a[PackageSemanticConventions.AttributePackageChecksumAlgorithm]);
+        });
+    }
+
+    [Fact]
     public void ReportIncludesAKnownDependencyOfTheTestProject()
     {
         DependencyInventoryReporter.ResetForTesting();

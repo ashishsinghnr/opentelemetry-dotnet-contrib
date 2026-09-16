@@ -262,6 +262,60 @@ public class DepsManifestPackagesTests
     }
 
     [Fact]
+    public void ChecksumIsSplitFromItsAlgorithmPrefix()
+    {
+        // NuGet records the hash as "<algorithm>-<base64>".
+        const string Manifest = """
+        {
+          "targets": {
+            ".NETCoreApp,Version=v8.0": {
+              "Serilog/4.0.0": { "runtime": { "lib/net8.0/Serilog.dll": {} } }
+            }
+          },
+          "libraries": {
+            "Serilog/4.0.0": {
+              "type": "package",
+              "sha512": "sha512-LM5IKPSylMYp42YC9bnL+JNUnQUS2y9TgoFLjnqeXLpDvqeyiQ=="
+            }
+          }
+        }
+        """;
+
+        var package = Assert.Single(ReadPackages(Manifest));
+
+        Assert.Equal("sha512", package.ChecksumAlgorithm);
+        Assert.Equal("LM5IKPSylMYp42YC9bnL+JNUnQUS2y9TgoFLjnqeXLpDvqeyiQ==", package.Checksum);
+    }
+
+    [Theory]
+    [InlineData("""{ "type": "package" }""")]
+    [InlineData("""{ "type": "package", "sha512": "" }""")]
+    [InlineData("""{ "type": "package", "sha512": "nodashhere" }""")]
+    [InlineData("""{ "type": "package", "sha512": "-leadingdash" }""")]
+    [InlineData("""{ "type": "package", "sha512": "trailingdash-" }""")]
+    [InlineData("""{ "type": "package", "sha512": 5 }""")]
+    public void PackageWithNoUsableChecksumReportsNone(string libraryEntry)
+    {
+        // An absent or unprefixed hash is reported as none rather than guessed at,
+        // because a hash of an unknown algorithm cannot be verified.
+        var manifest = $$"""
+        {
+          "targets": {
+            ".NETCoreApp,Version=v8.0": {
+              "Serilog/4.0.0": { "runtime": { "lib/net8.0/Serilog.dll": {} } }
+            }
+          },
+          "libraries": { "Serilog/4.0.0": {{libraryEntry}} }
+        }
+        """;
+
+        var package = Assert.Single(ReadPackages(manifest));
+
+        Assert.Null(package.Checksum);
+        Assert.Null(package.ChecksumAlgorithm);
+    }
+
+    [Fact]
     public void HostManifestListIsSplitOnSemicolonOnEveryPlatform()
     {
         // The host separates the paths with a semicolon everywhere, so splitting

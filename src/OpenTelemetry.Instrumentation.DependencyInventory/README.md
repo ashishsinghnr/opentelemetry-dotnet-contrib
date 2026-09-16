@@ -15,7 +15,9 @@ package, so that a backend can correlate them against known vulnerabilities.
 > [!IMPORTANT]
 > OpenTelemetry does not define a semantic convention for an application's
 > dependency inventory. The `package.*` attributes emitted by this package are
-> **not** part of any OpenTelemetry specification and may change.
+> **not** part of any OpenTelemetry specification and may change. They follow the
+> names `opentelemetry-java-instrumentation` already emits, rather than being
+> invented here.
 
 Attributes are carried in each record's state, so they arrive in
 `LogRecord.Attributes` and no `IncludeScopes` configuration is needed. Enable
@@ -94,12 +96,18 @@ One record per package:
 
 | Attribute | Example | Description |
 | --------- | ------- | ----------- |
-| `event.name` | `package.dependency` | Identifies the record. |
+| `event.name` | `package.info` | Identifies the record. |
 | `package.purl` | `pkg:nuget/Newtonsoft.Json@13.0.3` | [Package URL](https://github.com/package-url/purl-spec), the identifier vulnerability databases key on. |
 | `package.name` | `Newtonsoft.Json` | Package identifier. |
 | `package.version` | `13.0.3` | Package version. |
 | `package.type` | `nuget` | Package ecosystem. |
 | `package.loaded` | `true` | Whether any of the package's assemblies were loaded when the inventory was captured. |
+| `package.checksum` | `LM5IKPSylMYp42YC9bnL...` | Hash of the package's content, verifying it against the one published. Omitted when the manifest records none. |
+| `package.checksum_algorithm` | `sha512` | Algorithm the checksum was computed with. Omitted with the checksum. |
+
+The event name and the `package.*` attributes match those emitted by
+[`opentelemetry-java-instrumentation`][java-jar-analyzer], so that one backend
+rule reads both runtimes. `package.purl` and `package.loaded` are additional.
 
 Exported as OTLP, one record looks like this:
 
@@ -108,15 +116,19 @@ Exported as OTLP, one record looks like this:
   "body": { "stringValue": "Dependency Newtonsoft.Json 13.0.3" },
   "severityText": "Information",
   "attributes": [
-    { "key": "event.name",      "value": { "stringValue": "package.dependency" } },
+    { "key": "event.name",      "value": { "stringValue": "package.info" } },
     { "key": "package.purl",    "value": { "stringValue": "pkg:nuget/Newtonsoft.Json@13.0.3" } },
     { "key": "package.name",    "value": { "stringValue": "Newtonsoft.Json" } },
     { "key": "package.version", "value": { "stringValue": "13.0.3" } },
     { "key": "package.type",    "value": { "stringValue": "nuget" } },
-    { "key": "package.loaded",  "value": { "boolValue": true } }
+    { "key": "package.loaded",  "value": { "boolValue": true } },
+    { "key": "package.checksum", "value": { "stringValue": "LM5IKPSylMYp42YC9bnL..." } },
+    { "key": "package.checksum_algorithm", "value": { "stringValue": "sha512" } }
   ]
 }
 ```
+
+[java-jar-analyzer]: https://github.com/open-telemetry/opentelemetry-java-instrumentation/pull/9301
 
 The package version is the **package's** version, which routinely differs from
 the version of the assemblies it ships: `Newtonsoft.Json` 13.0.3 ships assembly

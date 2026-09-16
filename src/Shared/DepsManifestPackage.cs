@@ -8,11 +8,18 @@ namespace OpenTelemetry.Internal;
 /// </summary>
 internal sealed class DepsManifestPackage
 {
-    public DepsManifestPackage(string name, string version, List<string> assemblies)
+    public DepsManifestPackage(
+        string name,
+        string version,
+        List<string> assemblies,
+        string? checksum = null,
+        string? checksumAlgorithm = null)
     {
         this.Name = name;
         this.Version = version;
         this.Assemblies = assemblies;
+        this.Checksum = checksum;
+        this.ChecksumAlgorithm = checksumAlgorithm;
     }
 
     /// <summary>
@@ -33,6 +40,18 @@ internal sealed class DepsManifestPackage
     /// Gets the simple names of the assemblies this package supplies at runtime.
     /// </summary>
     public IReadOnlyList<string> Assemblies { get; }
+
+    /// <summary>
+    /// Gets the hash of the package's content, or <see langword="null"/> when the
+    /// manifest records none. This verifies the package against the one published.
+    /// </summary>
+    public string? Checksum { get; }
+
+    /// <summary>
+    /// Gets the algorithm <see cref="Checksum"/> was computed with, for example
+    /// <c>sha512</c>, or <see langword="null"/> when there is no checksum.
+    /// </summary>
+    public string? ChecksumAlgorithm { get; }
 
     /// <summary>
     /// Gets the <a href="https://github.com/package-url/purl-spec">Package URL</a>
