@@ -17,7 +17,8 @@ package, so that a backend can correlate them against known vulnerabilities.
 > dependency inventory. The `package.*` attributes emitted by this package are
 > **not** part of any OpenTelemetry specification and may change. They follow the
 > names `opentelemetry-java-instrumentation` already emits, rather than being
-> invented here.
+> invented here. A convention is proposed in
+> [semantic-conventions#4117](https://github.com/open-telemetry/semantic-conventions/issues/4117).
 
 Attributes are carried in each record's state, so they arrive in
 `LogRecord.Attributes` and no `IncludeScopes` configuration is needed. Enable
@@ -67,6 +68,13 @@ retry.
 Call `Report` once at startup. Concurrent calls never report twice, but a caller
 that arrives while another is in flight also returns zero and cannot tell the
 two cases apart.
+
+Because the inventory is emitted once and never repeated, the records can expire
+while the process is still running. A pod that has been up for a month emitted its
+inventory on day one, so a seven day log retention window no longer contains it,
+and a query for the packages that pod is running returns nothing. A backend that
+needs the inventory for the life of the process should store these records when
+they arrive, rather than relying on the raw records still being queryable.
 
 `Report` is synchronous and reads the manifest on the calling thread: roughly
 13 ms for 54 packages, scaling with the size of the dependency graph. Call it off

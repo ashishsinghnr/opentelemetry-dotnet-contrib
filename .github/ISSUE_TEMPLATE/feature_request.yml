@@ -34,6 +34,7 @@ body:
         - OpenTelemetry.Instrumentation.AWSLambda
         - OpenTelemetry.Instrumentation.Cassandra
         - OpenTelemetry.Instrumentation.ConfluentKafka
+        - OpenTelemetry.Instrumentation.DependencyInventory
         - OpenTelemetry.Instrumentation.ElasticsearchClient
         - OpenTelemetry.Instrumentation.EntityFrameworkCore
         - OpenTelemetry.Instrumentation.EventCounters
