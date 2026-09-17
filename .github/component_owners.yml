@@ -40,6 +40,7 @@ components:
     - g7ed6e
   src/OpenTelemetry.Instrumentation.DependencyInventory/:
     - ashishsinghnr
+    - alanwest
   src/OpenTelemetry.Instrumentation.ElasticsearchClient/:
     - ejsmith
   src/OpenTelemetry.Instrumentation.EntityFrameworkCore/:
@@ -144,6 +145,7 @@ components:
     - g7ed6e
   test/OpenTelemetry.Instrumentation.DependencyInventory.Tests/:
     - ashishsinghnr
+    - alanwest
   test/OpenTelemetry.Instrumentation.ElasticsearchClient.Tests/:
     - ejsmith
   test/OpenTelemetry.Instrumentation.EntityFrameworkCore.Tests/:

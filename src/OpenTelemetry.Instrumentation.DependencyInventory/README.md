@@ -3,7 +3,7 @@
 | Status | |
 | ------ | --- |
 | Stability | [Alpha](../../README.md#alpha) |
-| Code Owners | [@ashishsinghnr](https://github.com/ashishsinghnr) |
+| Code Owners | [@ashishsinghnr](https://github.com/ashishsinghnr), [@alanwest](https://github.com/alanwest) |
 
 [![NuGet version badge](https://img.shields.io/nuget/v/OpenTelemetry.Instrumentation.DependencyInventory)](https://www.nuget.org/packages/OpenTelemetry.Instrumentation.DependencyInventory)
 [![NuGet download count badge](https://img.shields.io/nuget/dt/OpenTelemetry.Instrumentation.DependencyInventory)](https://www.nuget.org/packages/OpenTelemetry.Instrumentation.DependencyInventory)
@@ -63,11 +63,8 @@ The inventory of a running process cannot change, so only the first call that
 reports something takes effect; later calls do nothing and return zero. A call
 that reports nothing does not consume that one chance, so a caller that runs
 before the logging pipeline is ready, or that hits a transient failure, can
-retry.
-
-Call `Report` once at startup. Concurrent calls never report twice, but a caller
-that arrives while another is in flight also returns zero and cannot tell the
-two cases apart.
+retry. Concurrent calls never report twice, but a caller that arrives while
+another is in flight also returns zero and cannot tell the two cases apart.
 
 Because the inventory is emitted once and never repeated, the records can expire
 while the process is still running. A pod that has been up for a month emitted its
@@ -76,9 +73,9 @@ and a query for the packages that pod is running returns nothing. A backend that
 needs the inventory for the life of the process should store these records when
 they arrive, rather than relying on the raw records still being queryable.
 
-`Report` is synchronous and reads the manifest on the calling thread: roughly
-13 ms for 54 packages, scaling with the size of the dependency graph. Call it off
-the startup path if that latency matters.
+`Report` is synchronous and parses the manifest on the calling thread, so its cost
+scales with the size of the dependency graph. Call it off the startup path if that
+latency matters.
 
 ### Applications loaded by a host
 
@@ -114,8 +111,9 @@ One record per package:
 | `package.checksum_algorithm` | `sha512` | Algorithm the checksum was computed with. Omitted with the checksum. |
 
 The event name and the `package.*` attributes match those emitted by
-[`opentelemetry-java-instrumentation`][java-jar-analyzer], so that one backend
-rule reads both runtimes. `package.purl` and `package.loaded` are additional.
+[`opentelemetry-java-instrumentation`](https://github.com/open-telemetry/opentelemetry-java-instrumentation/pull/9301),
+so that one backend rule reads both runtimes. `package.purl` and
+`package.loaded` are additional.
 
 Exported as OTLP, one record looks like this:
 
@@ -135,8 +133,6 @@ Exported as OTLP, one record looks like this:
   ]
 }
 ```
-
-[java-jar-analyzer]: https://github.com/open-telemetry/opentelemetry-java-instrumentation/pull/9301
 
 The package version is the **package's** version, which routinely differs from
 the version of the assemblies it ships: `Newtonsoft.Json` 13.0.3 ships assembly
@@ -179,15 +175,20 @@ DependencyInventoryReporter.Report(loggerFactory, new DependencyInventoryOptions
 Every option can also be set by environment variable, so that a deployment can be
 adjusted without rebuilding it. A value set in code takes precedence.
 
-| Variable | Option |
-| -------- | ------ |
-| `OTEL_DOTNET_EXPERIMENTAL_DEPENDENCY_INVENTORY_ENABLED` | `Enabled` |
-| `OTEL_DOTNET_EXPERIMENTAL_DEPENDENCY_INVENTORY_MAX_PACKAGES` | `MaxPackages` |
-| `OTEL_DOTNET_EXPERIMENTAL_DEPENDENCY_INVENTORY_INCLUDE_UNLOADED_PACKAGES` | `IncludeUnloadedPackages` |
+| Variable | Option | Accepted values |
+| -------- | ------ | --------------- |
+| `OTEL_DOTNET_EXPERIMENTAL_DEPENDENCY_INVENTORY_ENABLED` | `Enabled` | `true` or `false`, any casing |
+| `OTEL_DOTNET_EXPERIMENTAL_DEPENDENCY_INVENTORY_MAX_PACKAGES` | `MaxPackages` | a positive integer, digits only |
+| `OTEL_DOTNET_EXPERIMENTAL_DEPENDENCY_INVENTORY_INCLUDE_UNLOADED_PACKAGES` | `IncludeUnloadedPackages` | `true` or `false`, any casing |
 
 Setting `..._ENABLED=false` turns the inventory off for an application that
-already calls `Report`. A malformed value is ignored, the default is kept, and a
-diagnostic is written to the event source.
+already calls `Report`. Only `true` and `false` are recognized, so `1` and `0`
+leave the default in place.
+
+Any value that cannot be parsed is ignored, the default is kept, and a diagnostic
+is written to the event source. `..._MAX_PACKAGES` also keeps the default when the
+value is not positive, because a cap of zero would disable the inventory silently;
+use `..._ENABLED` to turn it off.
 
 ## Supported runtimes
 
@@ -208,13 +209,16 @@ empty inventory can be told apart from an application with no dependencies.
 
 * **Single-file publish and Native AOT** do not carry a readable manifest, so
   nothing is reported. A diagnostic is written to the event source.
-* **Trimmed applications** list packages in the manifest whose assemblies were
-  trimmed away. These are correctly reported with `package.loaded` set to
-  `false`.
-* **Assemblies loaded at runtime** through `Assembly.LoadFrom` and similar are
-  not in the manifest and are not reported.
-* **An application loaded as a library by a host** reports the host's inventory
-  unless its own assembly is passed explicitly. See
+* **Trimmed applications** may list packages in the manifest whose assemblies
+  were trimmed away. Those are reported with `package.loaded` set to `false`,
+  since nothing from them can load.
+* **Assemblies absent from the manifest are never reported**, however they were
+  loaded. A plugin resolved at runtime from outside the deployment is invisible
+  here, though one that the manifest does list counts as loaded whichever API
+  loaded it.
+* **An application loaded as a library by a host** describes the host, not
+  itself, unless its own assembly is passed explicitly: it reports the host's
+  inventory when the host has a manifest, and nothing when it does not. See
   [Applications loaded by a host](#applications-loaded-by-a-host).
 * **Framework assemblies** are not NuGet packages and are not reported.
 * **Vulnerability correlation happens in the backend.** This package emits only
