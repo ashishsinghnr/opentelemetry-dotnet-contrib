@@ -18,30 +18,12 @@ public static class AssemblyLoadInstrumentation
 #endif
 
     /// <summary>
-    /// Reports the NuGet packages already loaded, one log record per package, then
-    /// reports each further package the first time one of its assemblies loads.
+    /// Reports loaded NuGet packages, then each package as it first loads.
     /// </summary>
-    /// <param name="loggerFactory">
-    /// The logger factory the OpenTelemetry logging provider is registered on. It
-    /// must live as long as the process.
-    /// </param>
-    /// <param name="options">
-    /// The instrumentation options, or <see langword="null"/> for the defaults.
-    /// </param>
-    /// <param name="assembly">
-    /// The assembly whose <c>.deps.json</c> describes the deployment, or
-    /// <see langword="null"/> for the entry assembly. Pass it when a host loads
-    /// the application as a library, such as a serverless function, because the
-    /// entry assembly is then the host's.
-    /// </param>
-    /// <returns>
-    /// The number of packages already loaded. Zero when the instrumentation is
-    /// unavailable or has already started.
-    /// </returns>
-    /// <remarks>
-    /// Only the first call that starts takes effect. A call that fails to start
-    /// can be retried.
-    /// </remarks>
+    /// <param name="loggerFactory">Factory with the OpenTelemetry logging provider; must outlive the process.</param>
+    /// <param name="options">Options, or <see langword="null"/> for the defaults.</param>
+    /// <param name="assembly">Assembly whose <c>.deps.json</c> to read; <see langword="null"/> for the entry assembly.</param>
+    /// <returns>Packages reported now; zero if disabled, unavailable, or already started.</returns>
     public static int Start(
         ILoggerFactory loggerFactory,
         AssemblyLoadInstrumentationOptions? options = null,
@@ -61,8 +43,7 @@ public static class AssemblyLoadInstrumentation
 #if NET
             LoadedPackageObserver? observer = null;
 
-            // Telemetry must never stop an application starting. A disposed
-            // factory throws from CreateLogger.
+            // Never fail the application; a disposed factory throws here.
             try
             {
                 var logger = loggerFactory.CreateLogger(typeof(AssemblyLoadInstrumentation).FullName!);
@@ -91,9 +72,7 @@ public static class AssemblyLoadInstrumentation
         return 0;
     }
 
-    /// <summary>
-    /// Stops observation and resets the once-per-process guard. For testing only.
-    /// </summary>
+    /// <summary>For tests: stops observing and allows Start again.</summary>
     internal static void ResetForTesting()
     {
 #if NET

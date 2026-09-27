@@ -8,8 +8,7 @@ using OpenTelemetry.Logs;
 
 namespace OpenTelemetry.Instrumentation.AssemblyLoad.Tests;
 
-// The test host's entry assembly is testhost, so the tests pass their own
-// assembly: the same path a host-loaded serverless function takes.
+// Tests pass their own assembly: under testhost the entry assembly is the host's.
 [Collection(TestManifest.Collection)]
 public sealed class AssemblyLoadInstrumentationTests : IDisposable
 {
@@ -270,7 +269,7 @@ public sealed class AssemblyLoadInstrumentationTests : IDisposable
         LoggerFactory.Create(builder => builder.AddOpenTelemetry(options =>
             options.AddInMemoryExporter(exported)));
 
-    // Stops straight away so a later load cannot change the count under test.
+    // Stops at once so a later load cannot change the count.
     private static int StartAndStop(ILoggerFactory loggerFactory, AssemblyLoadInstrumentationOptions? options = null)
     {
         var count = AssemblyLoadInstrumentation.Start(loggerFactory, options, TestManifest.Assembly);

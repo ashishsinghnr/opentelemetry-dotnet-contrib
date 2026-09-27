@@ -150,7 +150,7 @@ public class DepsManifestTests
     [Fact]
     public void PlaceholderRuntimeAssetIsNotAnAssembly()
     {
-        // "_._" marks a framework the package intentionally ships nothing for.
+        // "_._" means no assets for that framework.
         const string Manifest = """
         {
           "targets": {
@@ -272,7 +272,7 @@ public class DepsManifestTests
             var framework = Path.Combine(directory.FullName, "Microsoft.NETCore.App.deps.json");
             File.WriteAllText(framework, "{}");
 
-            // The framework's manifest is listed first, as the host lists it.
+            // Listed first, as the host does.
             var list = framework + ";" + wanted;
 
             Assert.Equal(

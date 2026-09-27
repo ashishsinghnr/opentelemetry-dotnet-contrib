@@ -2,8 +2,7 @@
 
   <PropertyGroup>
     <!-- OmniSharp/VS Code requires TargetFrameworks to be in descending order for IntelliSense and analysis. -->
-    <!-- .NET Framework is not targeted: these tests exercise the dependency
-    manifest, which only .NET (Core) applications produce. -->
+    <!-- No .NET Framework: it has no .deps.json. -->
     <TargetFrameworks>$(SupportedNetTargets)</TargetFrameworks>
     <Description>Unit test project for the Assembly Load instrumentation for OpenTelemetry.</Description>
   </PropertyGroup>

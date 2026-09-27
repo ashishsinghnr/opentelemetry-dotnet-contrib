@@ -7,11 +7,7 @@ namespace OpenTelemetry.Instrumentation.AssemblyLoad;
 /// Names for the <c>artifact.loaded</c> event proposed in semantic-conventions#4117.
 /// </summary>
 /// <remarks>
-/// A consumed package is an artifact in SLSA's terms, so the existing
-/// <c>artifact.*</c> attributes are used and the event name says it was loaded.
-/// The service's own build is identified on the resource by existing attributes
-/// such as <c>container.image.id</c>, never by <c>artifact.*</c>, so flattened
-/// resource and record attributes cannot collide.
+/// <c>artifact.*</c> is never set on the resource, so flattened attributes cannot collide.
 /// </remarks>
 internal static class ArtifactSemanticConventions
 {
@@ -19,7 +15,7 @@ internal static class ArtifactSemanticConventions
 
     public const string AttributeEventName = "event.name";
 
-    // Carries ecosystem, name, and version; the key to join the SBOM on.
+    // Joins the record to the SBOM.
     public const string AttributeArtifactPurl = "artifact.purl";
 
     public const string AttributeArtifactVersion = "artifact.version";

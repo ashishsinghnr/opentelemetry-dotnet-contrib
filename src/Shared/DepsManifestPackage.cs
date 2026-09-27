@@ -21,27 +21,18 @@ internal sealed class DepsManifestPackage
     public string Name { get; }
 
     /// <summary>
-    /// Gets the package version, for example <c>13.0.3</c>.
+    /// Gets the package version, for example <c>13.0.3</c>; not the assembly version.
     /// </summary>
-    /// <remarks>
-    /// This is the package version, which routinely differs from the version of
-    /// the assemblies the package ships.
-    /// </remarks>
     public string Version { get; }
 
     /// <summary>
-    /// Gets the simple names of the assemblies this package supplies at runtime.
+    /// Gets the simple names of the runtime assemblies the package supplies.
     /// </summary>
     public IReadOnlyList<string> Assemblies { get; }
 
     /// <summary>
-    /// Gets the <a href="https://github.com/package-url/purl-spec">Package URL</a>
-    /// identifying this package.
+    /// Gets the <a href="https://github.com/package-url/purl-spec">Package URL</a>,
+    /// percent-encoded as the specification requires.
     /// </summary>
-    /// <remarks>
-    /// NuGet allows non-ASCII letters in an ID, which the specification requires
-    /// to be percent-encoded as UTF-8. The characters left unescaped are exactly
-    /// the specification's allowed set.
-    /// </remarks>
     public string Purl => $"pkg:nuget/{Uri.EscapeDataString(this.Name)}@{Uri.EscapeDataString(this.Version)}";
 }

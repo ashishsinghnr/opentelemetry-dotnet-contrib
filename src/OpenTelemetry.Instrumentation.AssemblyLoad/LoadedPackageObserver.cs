@@ -14,9 +14,8 @@ namespace OpenTelemetry.Instrumentation.AssemblyLoad;
 /// Reports each NuGet package the first time one of its assemblies loads.
 /// </summary>
 /// <remarks>
-/// The <c>.deps.json</c> manifest is only a lookup from assembly to package; it
-/// is never reported whole. It is needed because only the package version, not
-/// the assembly version, resolves in a vulnerability database.
+/// <c>.deps.json</c> is only a lookup: assembly names and versions do not
+/// reliably identify their package.
 /// </remarks>
 internal sealed class LoadedPackageObserver
 {
@@ -31,12 +30,10 @@ internal sealed class LoadedPackageObserver
     /// <summary>
     /// Initializes a new instance of the <see cref="LoadedPackageObserver"/> class.
     /// </summary>
-    /// <param name="logger">The logger to emit records through.</param>
-    /// <param name="packages">The packages the manifest records.</param>
-    /// <param name="maxPackages">The most packages to report.</param>
-    /// <param name="loadContext">
-    /// The load context the manifest describes, or <see langword="null"/> for any.
-    /// </param>
+    /// <param name="logger">Logger to emit through.</param>
+    /// <param name="packages">Packages from the manifest.</param>
+    /// <param name="maxPackages">Most packages to report.</param>
+    /// <param name="loadContext">Context to match, or <see langword="null"/> for any.</param>
     internal LoadedPackageObserver(
         ILogger logger,
         List<DepsManifestPackage> packages,
@@ -52,25 +49,19 @@ internal sealed class LoadedPackageObserver
         {
             foreach (var assemblyName in package.Assemblies)
             {
-                // The first package wins, as it does for the host.
+                // Keep the first package that lists the assembly.
                 this.packagesByAssemblyName.TryAdd(assemblyName, package);
             }
         }
     }
 
     /// <summary>
-    /// Creates an observer from the manifest that describes an assembly.
+    /// Creates an observer from an assembly's manifest.
     /// </summary>
-    /// <param name="logger">The logger to emit records through.</param>
-    /// <param name="options">The instrumentation options.</param>
-    /// <param name="assembly">
-    /// The assembly whose manifest to read, or <see langword="null"/> for the
-    /// entry assembly.
-    /// </param>
-    /// <returns>
-    /// The observer, not yet started, or <see langword="null"/> when no manifest
-    /// could be read.
-    /// </returns>
+    /// <param name="logger">Logger to emit through.</param>
+    /// <param name="options">Instrumentation options.</param>
+    /// <param name="assembly">Assembly whose manifest to read; <see langword="null"/> for the entry assembly.</param>
+    /// <returns>An unstarted observer, or <see langword="null"/> if no manifest was read.</returns>
     public static LoadedPackageObserver? Create(
         ILogger logger,
         AssemblyLoadInstrumentationOptions options,
@@ -98,8 +89,7 @@ internal sealed class LoadedPackageObserver
                 packages = DepsManifest.ReadPackages(stream);
             }
 
-            // A plugin context may load another version the manifest does not
-            // describe, so only the target's own context is matched.
+            // Other contexts may load versions this manifest does not describe.
             return new LoadedPackageObserver(
                 logger,
                 packages,
@@ -114,12 +104,12 @@ internal sealed class LoadedPackageObserver
     }
 
     /// <summary>
-    /// Reports the packages already loaded and begins observing later loads.
+    /// Reports loaded packages, then observes later loads.
     /// </summary>
-    /// <returns>The number of packages already loaded.</returns>
+    /// <returns>Packages reported now.</returns>
     public int Start()
     {
-        // Subscribe before sweeping so no load is missed; duplicates are ignored.
+        // Subscribe first so no load is missed.
         AppDomain.CurrentDomain.AssemblyLoad += this.OnAssemblyLoad;
 
         var reportedCount = 0;
@@ -135,15 +125,15 @@ internal sealed class LoadedPackageObserver
     }
 
     /// <summary>
-    /// Stops observing loads. Safe to call more than once.
+    /// Stops observing. Idempotent.
     /// </summary>
     public void Stop() => this.TryStop();
 
     /// <summary>
-    /// Reports the package that supplied an assembly, unless already reported.
+    /// Reports the package of a loaded assembly, once.
     /// </summary>
-    /// <param name="assembly">The loaded assembly.</param>
-    /// <returns><see langword="true"/> when a record was emitted.</returns>
+    /// <param name="assembly">Loaded assembly.</param>
+    /// <returns><see langword="true"/> if a record was emitted.</returns>
     internal bool TryReport(Assembly assembly)
     {
         if (assembly.IsDynamic
@@ -156,13 +146,12 @@ internal sealed class LoadedPackageObserver
     }
 
     /// <summary>
-    /// Reports the package that supplies an assembly, unless already reported.
+    /// Reports the package of a loaded assembly, once.
     /// </summary>
-    /// <param name="assemblyName">The simple name of the loaded assembly.</param>
-    /// <returns><see langword="true"/> when a record was emitted.</returns>
+    /// <param name="assemblyName">Simple name of the loaded assembly.</param>
+    /// <returns><see langword="true"/> if a record was emitted.</returns>
     internal bool TryReport(string assemblyName)
     {
-        // Framework assemblies are absent from the manifest and not packages.
         if (Volatile.Read(ref this.stopped) == 1
             || !this.packagesByAssemblyName.TryGetValue(assemblyName, out var package)
             || !this.seenPackages.TryAdd(package, 0))
@@ -172,7 +161,7 @@ internal sealed class LoadedPackageObserver
 
         if (Interlocked.Increment(ref this.seenCount) > this.maxPackages)
         {
-            // Nothing more can be reported, so stop paying for every load.
+            // Nothing more can be reported; stop observing.
             if (this.TryStop())
             {
                 AssemblyLoadEventSource.Log.PackageLimitReached(this.maxPackages);
@@ -198,7 +187,7 @@ internal sealed class LoadedPackageObserver
 
     private void OnAssemblyLoad(object? sender, AssemblyLoadEventArgs args)
     {
-        // Runs inside the application's load; an escaping exception would fail it.
+        // Runs inside the app's load: an exception here would fail it.
         try
         {
             this.TryReport(args.LoadedAssembly);

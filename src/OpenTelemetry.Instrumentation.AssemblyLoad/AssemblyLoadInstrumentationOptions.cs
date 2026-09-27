@@ -9,8 +9,7 @@ namespace OpenTelemetry.Instrumentation.AssemblyLoad;
 /// Options for the assembly load instrumentation.
 /// </summary>
 /// <remarks>
-/// Each option can also be set by environment variable. A value set in code
-/// takes precedence.
+/// Each option can also be set by environment variable; code takes precedence.
 /// </remarks>
 public class AssemblyLoadInstrumentationOptions
 {
@@ -25,8 +24,7 @@ public class AssemblyLoadInstrumentationOptions
     private int maxPackages = DefaultMaxPackages;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="AssemblyLoadInstrumentationOptions"/>
-    /// class, reading any values set by environment variable.
+    /// Initializes a new instance of the <see cref="AssemblyLoadInstrumentationOptions"/> class.
     /// </summary>
     public AssemblyLoadInstrumentationOptions()
         : this(new ConfigurationBuilder().AddEnvironmentVariables().Build())
@@ -54,24 +52,16 @@ public class AssemblyLoadInstrumentationOptions
 
     /// <summary>
     /// Gets or sets a value indicating whether loaded packages are reported.
-    /// Default value: <see langword="true"/>.
+    /// Default: <see langword="true"/>. Env: <c>OTEL_DOTNET_EXPERIMENTAL_ASSEMBLY_LOAD_ENABLED</c>.
     /// </summary>
-    /// <remarks>
-    /// Can also be set by the
-    /// <c>OTEL_DOTNET_EXPERIMENTAL_ASSEMBLY_LOAD_ENABLED</c> environment variable.
-    /// </remarks>
     public bool Enabled { get; set; } = true;
 
     /// <summary>
-    /// Gets or sets the most packages reported over the life of the process.
-    /// Default value: 1000.
+    /// Gets or sets the most packages reported per process; observation then stops.
+    /// Default: 1000. Env: <c>OTEL_DOTNET_EXPERIMENTAL_ASSEMBLY_LOAD_MAX_PACKAGES</c>.
     /// </summary>
     /// <remarks>
-    /// Once reached, a diagnostic is written and observation stops. A value that
-    /// is not positive keeps the default, because zero would disable reporting
-    /// silently; use <see cref="Enabled"/> instead. Can also be set by the
-    /// <c>OTEL_DOTNET_EXPERIMENTAL_ASSEMBLY_LOAD_MAX_PACKAGES</c> environment
-    /// variable.
+    /// A non-positive value keeps the default; use <see cref="Enabled"/> to turn reporting off.
     /// </remarks>
     public int MaxPackages
     {

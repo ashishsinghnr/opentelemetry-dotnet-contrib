@@ -14,8 +14,7 @@ internal static class ArtifactLoadedRecord
 {
     public static void Write(ILogger logger, DepsManifestPackage package)
     {
-        // Carried as state, not a scope, so attributes export without
-        // IncludeScopes. No "{OriginalFormat}" entry, which some exporters keep.
+        // State, not a scope, so no IncludeScopes is needed. No "{OriginalFormat}".
         var state = new List<KeyValuePair<string, object?>>(3)
         {
             new(ArtifactSemanticConventions.AttributeEventName, ArtifactSemanticConventions.EventName),

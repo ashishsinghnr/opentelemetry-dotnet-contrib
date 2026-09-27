@@ -8,20 +8,15 @@ using System.Text.Json;
 namespace OpenTelemetry.Internal;
 
 /// <summary>
-/// Reads the application's <c>.deps.json</c> manifest, which records the NuGet
-/// package that supplied each deployed assembly. Only .NET (Core) produces one.
+/// Reads the <c>.deps.json</c> manifest, which maps each deployed assembly to its NuGet package.
 /// </summary>
 internal static class DepsManifest
 {
     /// <summary>
-    /// Locates the manifest belonging to the given assembly.
+    /// Finds an assembly's manifest, looking beside the assembly first.
     /// </summary>
-    /// <param name="assembly">The assembly whose manifest is wanted.</param>
-    /// <returns>The manifest path, or <see langword="null"/> when absent.</returns>
-    /// <remarks>
-    /// The assembly's own directory is searched first, so an assembly loaded by a
-    /// host resolves to its own manifest rather than the host's.
-    /// </remarks>
+    /// <param name="assembly">Assembly whose manifest to find.</param>
+    /// <returns>The path, or <see langword="null"/> if absent.</returns>
     internal static string? FindPath(Assembly assembly)
     {
         var assemblyName = assembly.GetName().Name;
@@ -32,8 +27,7 @@ internal static class DepsManifest
 
         var expectedFileName = assemblyName + ".deps.json";
 
-        // The assembly's own directory is authoritative when it is known. A
-        // single-file or in-memory assembly reports an empty Location.
+        // A host-loaded assembly's own manifest sits beside it.
         var assemblyDirectory = GetAssemblyDirectory(assembly);
         if (assemblyDirectory != null)
         {
@@ -44,8 +38,7 @@ internal static class DepsManifest
             }
         }
 
-        // The host lists the framework's manifests alongside the application's,
-        // so match on name rather than taking the first.
+        // The list also holds framework manifests, so match by name.
         if (AppContext.GetData("APP_CONTEXT_DEPS_FILES") is string depsFiles)
         {
             var listed = FindInDepsFilesList(depsFiles, expectedFileName);
@@ -55,8 +48,7 @@ internal static class DepsManifest
             }
         }
 
-        // Fall back to the output directory, keyed on the assembly name because
-        // the process may be the shared host ("dotnet").
+        // Keyed on the assembly name: the process may be the "dotnet" host.
         var baseDirectory = AppContext.BaseDirectory;
         if (string.IsNullOrEmpty(baseDirectory))
         {
@@ -68,13 +60,10 @@ internal static class DepsManifest
     }
 
     /// <summary>
-    /// Enumerates every package recorded in the manifest.
+    /// Reads every package in the manifest, excluding project output.
     /// </summary>
-    /// <param name="manifest">The <c>.deps.json</c> manifest to read.</param>
-    /// <returns>
-    /// The name, version, and supplied assemblies of each package. Project
-    /// output is excluded, because it has no published identity.
-    /// </returns>
+    /// <param name="manifest">The <c>.deps.json</c> content.</param>
+    /// <returns>The packages.</returns>
     internal static List<DepsManifestPackage> ReadPackages(Stream manifest)
     {
         using var document = JsonDocument.Parse(manifest);
@@ -105,15 +94,13 @@ internal static class DepsManifest
     }
 
     /// <summary>
-    /// Finds a named manifest in the host's list of manifests in use.
+    /// Finds a manifest by file name in the host's <c>APP_CONTEXT_DEPS_FILES</c> list.
     /// </summary>
-    /// <param name="depsFiles">The value of <c>APP_CONTEXT_DEPS_FILES</c>.</param>
-    /// <param name="expectedFileName">The manifest file name to look for.</param>
-    /// <returns>The matching path, or <see langword="null"/>.</returns>
+    /// <param name="depsFiles">The list.</param>
+    /// <param name="expectedFileName">File name to find.</param>
+    /// <returns>The path, or <see langword="null"/>.</returns>
     /// <remarks>
-    /// The host separates the paths with a semicolon on every platform, so
-    /// <see cref="Path.PathSeparator"/> must not be used: it is a colon on Unix,
-    /// where splitting on it would yield the whole list as one entry.
+    /// Always ';'-separated; <see cref="Path.PathSeparator"/> is ':' on Unix.
     /// </remarks>
     internal static string? FindInDepsFilesList(string depsFiles, string expectedFileName)
     {
@@ -133,18 +120,10 @@ internal static class DepsManifest
         return null;
     }
 
-    /// <summary>
-    /// Gets the directory an assembly was loaded from.
-    /// </summary>
-    /// <param name="assembly">The assembly to locate.</param>
-    /// <returns>
-    /// The directory, or <see langword="null"/> when it cannot be determined: a
-    /// dynamic assembly, a single-file publish, or an unreadable path.
-    /// </returns>
     [UnconditionalSuppressMessage(
         "SingleFile",
         "IL3000:Avoid accessing Assembly file path when publishing as a single file",
-        Justification = "An empty location is expected here and returns null so the caller falls back to its other probes. The base directory is not substituted, being wrong for an assembly loaded by a host.")]
+        Justification = "An empty location returns null and the caller tries its other probes.")]
     private static string? GetAssemblyDirectory(Assembly assembly)
     {
         if (assembly.IsDynamic)
@@ -167,8 +146,7 @@ internal static class DepsManifest
     {
         var targets = new List<JsonElement>();
 
-        // The root is kind-checked too: a manifest whose root is an array or a
-        // scalar is valid JSON, and TryGetProperty throws on anything but object.
+        // TryGetProperty throws on a non-object root.
         if (document.RootElement.ValueKind != JsonValueKind.Object
             || !document.RootElement.TryGetProperty("targets", out var targetsElement)
             || targetsElement.ValueKind != JsonValueKind.Object)
@@ -200,8 +178,7 @@ internal static class DepsManifest
 
         foreach (var asset in runtime.EnumerateObject())
         {
-            // Asset paths look like "lib/net8.0/Foo.dll". "_._" is a placeholder
-            // for shipping nothing; matched whole so a real "_.dll" is kept.
+            // "_._" is a placeholder for no assets; matched whole to keep "_.dll".
             if (Path.GetFileName(asset.Name) == "_._")
             {
                 continue;
@@ -217,13 +194,7 @@ internal static class DepsManifest
         return assemblies;
     }
 
-    /// <summary>
-    /// Splits a library key of the form <c>"&lt;package id&gt;/&lt;version&gt;"</c>.
-    /// </summary>
-    /// <param name="libraryKey">The manifest's library key.</param>
-    /// <param name="name">The package identifier.</param>
-    /// <param name="version">The package version.</param>
-    /// <returns><see langword="true"/> when the key was well formed.</returns>
+    // Splits "<package id>/<version>".
     private static bool TrySplitLibraryKey(string libraryKey, out string name, out string version)
     {
         var separatorIndex = libraryKey.LastIndexOf('/');
@@ -239,16 +210,9 @@ internal static class DepsManifest
         return true;
     }
 
-    /// <summary>
-    /// Determines whether a library is a published package.
-    /// </summary>
-    /// <param name="root">The manifest's root element.</param>
-    /// <param name="libraryKey">The library key to look up.</param>
-    /// <returns><see langword="true"/> when the library is a package.</returns>
     private static bool IsPackage(JsonElement root, string libraryKey)
     {
-        // Every level is kind-checked before it is read, so a malformed manifest
-        // reports "not a package" instead of throwing.
+        // Kind-checked at every level so a malformed manifest does not throw.
         if (root.ValueKind != JsonValueKind.Object
             || !root.TryGetProperty("libraries", out var libraries)
             || libraries.ValueKind != JsonValueKind.Object

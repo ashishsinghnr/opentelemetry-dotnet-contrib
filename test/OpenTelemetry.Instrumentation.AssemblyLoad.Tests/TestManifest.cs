@@ -7,12 +7,11 @@ using OpenTelemetry.Internal;
 namespace OpenTelemetry.Instrumentation.AssemblyLoad.Tests;
 
 /// <summary>
-/// Reads this test project's own manifest, for tests that load real packages.
+/// This test project's own manifest, for tests that load real packages.
 /// </summary>
 internal static class TestManifest
 {
-    // Loading assemblies and the instrumentation's guard are process-wide, so
-    // tests that touch either run in this collection, one at a time.
+    // Loads and the Start guard are process-wide, so these tests run serially.
     public const string Collection = "AssemblyLoad";
 
     public static Assembly Assembly { get; } = typeof(TestManifest).Assembly;
@@ -31,8 +30,7 @@ internal static class TestManifest
             StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Finds a package none of whose assemblies is loaded yet. Loading it uses it
-    /// up, so each call returns a different package.
+    /// Finds a package with no assembly loaded yet; loading it uses it up.
     /// </summary>
     /// <returns>The package and one of its assembly names.</returns>
     public static (DepsManifestPackage Package, string AssemblyName) FindUnloadedPackage()
