@@ -183,7 +183,7 @@ public class EntityFrameworkDiagnosticListenerTests : IDisposable
     public static TheoryData<string, bool> IsSqlLikeProviderTestCases()
     {
         // Get all the possible names and assume they are false
-        var values = DbSystemTestCases().ToDictionary((k) => (string)k[0], (v) => false);
+        var values = DbSystemTestCases().ToDictionary((k) => (string)k.Data.Item1, (v) => false);
 
         // Override specific entries to be true
         string[] supported =
@@ -225,9 +225,9 @@ public class EntityFrameworkDiagnosticListenerTests : IDisposable
 
         var testCases = new TheoryData<string, bool>();
 
-        foreach ((var name, var expected) in values)
+        foreach (var item in values)
         {
-            testCases.Add(name, expected);
+            testCases.Add(item.Key, item.Value);
         }
 
         return testCases;
@@ -235,7 +235,7 @@ public class EntityFrameworkDiagnosticListenerTests : IDisposable
 
     public static TheoryData<string, bool> IsBackslashEscapeProviderTestCases()
     {
-        var values = DbSystemTestCases().ToDictionary((k) => (string)k[0], (v) => false);
+        var values = DbSystemTestCases().ToDictionary((k) => (string)k.Data.Item1, (v) => false);
 
         string[] backslashEscapeProviders =
         [
@@ -309,8 +309,7 @@ public class EntityFrameworkDiagnosticListenerTests : IDisposable
             Assert.Equal("ItemTwo", items[2].Name);
         }
 
-        Assert.Single(exportedItems);
-        var activity = exportedItems[0];
+        var activity = Assert.Single(exportedItems);
 
         VerifyActivityData(activity);
     }
@@ -350,8 +349,7 @@ public class EntityFrameworkDiagnosticListenerTests : IDisposable
             Assert.Equal("ItemTwo", items[2].Name);
         }
 
-        Assert.Single(exportedItems);
-        var activity = exportedItems[0];
+        var activity = Assert.Single(exportedItems);
 
         VerifyActivityData(
             activity,
@@ -382,8 +380,7 @@ public class EntityFrameworkDiagnosticListenerTests : IDisposable
             }
         }
 
-        Assert.Single(exportedItems);
-        var activity = exportedItems[0];
+        var activity = Assert.Single(exportedItems);
 
         VerifyActivityData(activity, isError: true);
     }
@@ -448,8 +445,7 @@ public class EntityFrameworkDiagnosticListenerTests : IDisposable
             _ = context.Set<Item>().OrderBy(e => e.Name).ToList();
         }
 
-        Assert.Single(exportedItems);
-        var activity = exportedItems[0];
+        var activity = Assert.Single(exportedItems);
 
         Assert.True(activity.IsAllDataRequested);
         Assert.True(activity.ActivityTraceFlags.HasFlag(ActivityTraceFlags.Recorded));
@@ -505,8 +501,7 @@ public class EntityFrameworkDiagnosticListenerTests : IDisposable
             _ = context.Set<Item>().OrderBy(e => e.Name).ToList();
         }
 
-        Assert.Single(exportedItems);
-        var activity = exportedItems[0];
+        var activity = Assert.Single(exportedItems);
 
         Assert.True(activity.IsAllDataRequested);
         Assert.True(activity.ActivityTraceFlags.HasFlag(ActivityTraceFlags.Recorded));
