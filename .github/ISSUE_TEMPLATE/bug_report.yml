@@ -30,11 +30,11 @@ body:
         - OpenTelemetry.Instrumentation.AspNet
         - OpenTelemetry.Instrumentation.AspNet.TelemetryHttpModule
         - OpenTelemetry.Instrumentation.AspNetCore
+        - OpenTelemetry.Instrumentation.AssemblyLoad
         - OpenTelemetry.Instrumentation.AWS
         - OpenTelemetry.Instrumentation.AWSLambda
         - OpenTelemetry.Instrumentation.Cassandra
         - OpenTelemetry.Instrumentation.ConfluentKafka
-        - OpenTelemetry.Instrumentation.DependencyInventory
         - OpenTelemetry.Instrumentation.ElasticsearchClient
         - OpenTelemetry.Instrumentation.EntityFrameworkCore
         - OpenTelemetry.Instrumentation.EventCounters

@@ -1,35 +1,18 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-using System.Reflection;
-#if NET
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using System.Text.Json;
-#endif
 
 namespace OpenTelemetry.Internal;
 
 /// <summary>
 /// Reads the application's <c>.deps.json</c> manifest, which records the NuGet
-/// packages that supplied the assemblies deployed with the application.
+/// package that supplied each deployed assembly. Only .NET (Core) produces one.
 /// </summary>
-/// <remarks>
-/// Only .NET (Core) produces a manifest, so on .NET Framework and .NET Standard
-/// <see cref="IsSupported"/> is false and the reading members are not compiled.
-/// </remarks>
 internal static class DepsManifest
 {
-    /// <summary>
-    /// Gets a value indicating whether the current runtime produces a
-    /// <c>.deps.json</c> manifest at all.
-    /// </summary>
-    internal static bool IsSupported =>
-#if NET
-        true;
-#else
-        false;
-#endif
-
     /// <summary>
     /// Locates the manifest belonging to the given assembly.
     /// </summary>
@@ -41,7 +24,6 @@ internal static class DepsManifest
     /// </remarks>
     internal static string? FindPath(Assembly assembly)
     {
-#if NET
         var assemblyName = assembly.GetName().Name;
         if (string.IsNullOrEmpty(assemblyName))
         {
@@ -83,13 +65,8 @@ internal static class DepsManifest
 
         var probe = Path.Combine(baseDirectory, expectedFileName);
         return File.Exists(probe) ? probe : null;
-#else
-        _ = assembly;
-        return null;
-#endif
     }
 
-#if NET
     /// <summary>
     /// Enumerates every package recorded in the manifest.
     /// </summary>
@@ -111,7 +88,7 @@ internal static class DepsManifest
             {
                 if (library.Value.ValueKind != JsonValueKind.Object
                     || !TrySplitLibraryKey(library.Name, out var name, out var version)
-                    || !IsPackage(document.RootElement, library.Name, out var entry)
+                    || !IsPackage(document.RootElement, library.Name)
                     || !seen.Add(library.Name))
                 {
                     continue;
@@ -120,9 +97,7 @@ internal static class DepsManifest
                 packages.Add(new DepsManifestPackage(
                     name,
                     version,
-                    ReadRuntimeAssemblies(library.Value),
-                    ReadChecksum(entry, out var algorithm),
-                    algorithm));
+                    ReadRuntimeAssemblies(library.Value)));
             }
         }
 
@@ -265,17 +240,13 @@ internal static class DepsManifest
     }
 
     /// <summary>
-    /// Determines whether a library is a published package, and hands back its
-    /// entry so the caller can read the rest of it.
+    /// Determines whether a library is a published package.
     /// </summary>
     /// <param name="root">The manifest's root element.</param>
     /// <param name="libraryKey">The library key to look up.</param>
-    /// <param name="library">The library's entry, when it is a package.</param>
     /// <returns><see langword="true"/> when the library is a package.</returns>
-    private static bool IsPackage(JsonElement root, string libraryKey, out JsonElement library)
+    private static bool IsPackage(JsonElement root, string libraryKey)
     {
-        library = default;
-
         // Every level is kind-checked before it is read, so a malformed manifest
         // reports "not a package" instead of throwing.
         if (root.ValueKind != JsonValueKind.Object
@@ -289,37 +260,6 @@ internal static class DepsManifest
             return false;
         }
 
-        library = entry;
         return string.Equals(type.GetString(), "package", StringComparison.OrdinalIgnoreCase);
     }
-
-    /// <summary>
-    /// Reads a package's content hash, which NuGet records algorithm-prefixed as
-    /// <c>"sha512-&lt;base64&gt;"</c>.
-    /// </summary>
-    /// <param name="library">The library's entry in <c>libraries</c>.</param>
-    /// <param name="algorithm">The hash algorithm, or null.</param>
-    /// <returns>The hash, or <see langword="null"/> when none is recorded.</returns>
-    private static string? ReadChecksum(JsonElement library, out string? algorithm)
-    {
-        algorithm = null;
-
-        if (!library.TryGetProperty("sha512", out var hash)
-            || hash.ValueKind != JsonValueKind.String
-            || hash.GetString() is not { Length: > 0 } value)
-        {
-            return null;
-        }
-
-        var separatorIndex = value.IndexOf('-', StringComparison.Ordinal);
-        if (separatorIndex <= 0 || separatorIndex == value.Length - 1)
-        {
-            // Unprefixed values are not assumed to be any particular algorithm.
-            return null;
-        }
-
-        algorithm = value.Substring(0, separatorIndex);
-        return value.Substring(separatorIndex + 1);
-    }
-#endif
 }

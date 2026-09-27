@@ -5,7 +5,7 @@
     <!-- .NET Framework is not targeted: these tests exercise the dependency
     manifest, which only .NET (Core) applications produce. -->
     <TargetFrameworks>$(SupportedNetTargets)</TargetFrameworks>
-    <Description>Unit test project for the Dependency Inventory instrumentation for OpenTelemetry.</Description>
+    <Description>Unit test project for the Assembly Load instrumentation for OpenTelemetry.</Description>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(RepoRoot)\src\OpenTelemetry.Instrumentation.DependencyInventory\OpenTelemetry.Instrumentation.DependencyInventory.csproj" />
+    <ProjectReference Include="$(RepoRoot)\src\OpenTelemetry.Instrumentation.AssemblyLoad\OpenTelemetry.Instrumentation.AssemblyLoad.csproj" />
   </ItemGroup>
 
 </Project>

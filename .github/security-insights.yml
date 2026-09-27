@@ -115,6 +115,8 @@ repository:
         comment: OpenTelemetry.Instrumentation.AspNet.TelemetryHttpModule NuGet package distributed from NuGet.org.
       - uri: https://www.nuget.org/packages/OpenTelemetry.Instrumentation.AspNetCore
         comment: OpenTelemetry.Instrumentation.AspNetCore NuGet package distributed from NuGet.org.
+      - uri: https://www.nuget.org/packages/OpenTelemetry.Instrumentation.AssemblyLoad
+        comment: OpenTelemetry.Instrumentation.AssemblyLoad NuGet package distributed from NuGet.org.
       - uri: https://www.nuget.org/packages/OpenTelemetry.Instrumentation.AWS
         comment: OpenTelemetry.Instrumentation.AWS NuGet package distributed from NuGet.org.
       - uri: https://www.nuget.org/packages/OpenTelemetry.Instrumentation.AWSLambda
@@ -123,8 +125,6 @@ repository:
         comment: OpenTelemetry.Instrumentation.Cassandra NuGet package distributed from NuGet.org.
       - uri: https://www.nuget.org/packages/OpenTelemetry.Instrumentation.ConfluentKafka
         comment: OpenTelemetry.Instrumentation.ConfluentKafka NuGet package distributed from NuGet.org.
-      - uri: https://www.nuget.org/packages/OpenTelemetry.Instrumentation.DependencyInventory
-        comment: OpenTelemetry.Instrumentation.DependencyInventory NuGet package distributed from NuGet.org.
       - uri: https://www.nuget.org/packages/OpenTelemetry.Instrumentation.ElasticsearchClient
         comment: OpenTelemetry.Instrumentation.ElasticsearchClient NuGet package distributed from NuGet.org.
       - uri: https://www.nuget.org/packages/OpenTelemetry.Instrumentation.EntityFrameworkCore

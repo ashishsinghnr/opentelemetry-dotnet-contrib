@@ -26,6 +26,9 @@ components:
   src/OpenTelemetry.Extensions.Enrichment.Http/:
     - evgenyfedorov2
     - dariusclay
+  src/OpenTelemetry.Instrumentation.AssemblyLoad/:
+    - ashishsinghnr
+    - alanwest
   src/OpenTelemetry.Instrumentation.AWS/:
     - srprash
     - normj
@@ -38,9 +41,6 @@ components:
     - xsoheilalizadeh
   src/OpenTelemetry.Instrumentation.ConfluentKafka/:
     - g7ed6e
-  src/OpenTelemetry.Instrumentation.DependencyInventory/:
-    - ashishsinghnr
-    - alanwest
   src/OpenTelemetry.Instrumentation.ElasticsearchClient/:
     - ejsmith
   src/OpenTelemetry.Instrumentation.EntityFrameworkCore/:
@@ -131,6 +131,9 @@ components:
   test/OpenTelemetry.Extensions.Enrichment.Http.Tests/:
     - evgenyfedorov2
     - dariusclay
+  test/OpenTelemetry.Instrumentation.AssemblyLoad.Tests/:
+    - ashishsinghnr
+    - alanwest
   test/OpenTelemetry.Instrumentation.AWS.Tests/:
     - srprash
     - normj
@@ -143,9 +146,6 @@ components:
     - xsoheilalizadeh
   test/OpenTelemetry.Instrumentation.ConfluentKafka.Tests/:
     - g7ed6e
-  test/OpenTelemetry.Instrumentation.DependencyInventory.Tests/:
-    - ashishsinghnr
-    - alanwest
   test/OpenTelemetry.Instrumentation.ElasticsearchClient.Tests/:
     - ejsmith
   test/OpenTelemetry.Instrumentation.EntityFrameworkCore.Tests/:

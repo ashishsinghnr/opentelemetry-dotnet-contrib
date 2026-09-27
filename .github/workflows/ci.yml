@@ -66,10 +66,10 @@ jobs:
           extensions-enrichment-http: ['*/OpenTelemetry.Extensions.Enrichment.Http*/**', '!**/*.md']
           instrumentation-aspnet: ['*/OpenTelemetry.Instrumentation.AspNet/**', '*/OpenTelemetry.Instrumentation.AspNet.Tests/**', '*/OpenTelemetry.Instrumentation.AspNet.TelemetryHttpModule*/**', 'examples/AspNet/**', '!**/*.md']
           instrumentation-aspnetcore: ['*/OpenTelemetry.Instrumentation.AspNetCore*/**', '!**/*.md']
+          instrumentation-assemblyload: ['*/OpenTelemetry.Instrumentation.AssemblyLoad*/**', '!**/*.md']
           instrumentation-aws: ['*/OpenTelemetry.Extensions.AWS*/**', '*/OpenTelemetry.Instrumentation.AWS*/**', '!**/*.md']
           instrumentation-cassandra: ['*/OpenTelemetry.Instrumentation.Cassandra*/**', '!**/*.md']
           instrumentation-confluentkafka: ['*/OpenTelemetry.Instrumentation.ConfluentKafka*/**', 'examples/kafka/**', '!**/*.md']
-          instrumentation-dependencyinventory: ['*/OpenTelemetry.Instrumentation.DependencyInventory*/**', '!**/*.md']
           instrumentation-elasticsearchclient: ['*/OpenTelemetry.Instrumentation.ElasticsearchClient*/**', '!**/*.md']
           instrumentation-entityframeworkcore: ['*/OpenTelemetry.Instrumentation.EntityFrameworkCore*/**', '*/OpenTelemetry.Instrumentation.SqlClient/**', '!**/*.md']
           instrumentation-eventcounters: ['*/OpenTelemetry.Instrumentation.EventCounters*/**', 'examples/event-counters/**', '!**/*.md']
@@ -286,6 +286,18 @@ jobs:
       tfm-list: '[ "net8.0", "net9.0", "net10.0" ]'
       trigger: ${{ github.event_name }}
 
+  build-test-instrumentation-assemblyload:
+    needs: detect-changes
+    if: |
+      contains(needs.detect-changes.outputs.changes, 'instrumentation-assemblyload')
+      || contains(needs.detect-changes.outputs.changes, 'build')
+      || contains(needs.detect-changes.outputs.changes, 'shared')
+    uses: $/.github/workflows/Component.BuildTest.yml
+    with:
+      project-name: OpenTelemetry.Instrumentation.AssemblyLoad
+      code-cov-name: Instrumentation.AssemblyLoad
+      trigger: ${{ github.event_name }}
+
   build-test-instrumentation-aws:
     needs: detect-changes
     if: |
@@ -321,18 +333,6 @@ jobs:
     with:
       project-name: Component[OpenTelemetry.Instrumentation.ConfluentKafka]
       code-cov-name: Instrumentation.ConfluentKafka
-      trigger: ${{ github.event_name }}
-
-  build-test-instrumentation-dependencyinventory:
-    needs: detect-changes
-    if: |
-      contains(needs.detect-changes.outputs.changes, 'instrumentation-dependencyinventory')
-      || contains(needs.detect-changes.outputs.changes, 'build')
-      || contains(needs.detect-changes.outputs.changes, 'shared')
-    uses: ./.github/workflows/Component.BuildTest.yml
-    with:
-      project-name: OpenTelemetry.Instrumentation.DependencyInventory
-      code-cov-name: Instrumentation.DependencyInventory
       trigger: ${{ github.event_name }}
 
   build-test-instrumentation-elasticsearchclient:
@@ -766,10 +766,10 @@ jobs:
       build-test-extensions-enrichment-http,
       build-test-instrumentation-aspnet,
       build-test-instrumentation-aspnetcore,
+      build-test-instrumentation-assemblyload,
       build-test-instrumentation-aws,
       build-test-instrumentation-cassandra,
       build-test-instrumentation-confluentkafka,
-      build-test-instrumentation-dependencyinventory,
       build-test-instrumentation-elasticsearchclient,
       build-test-instrumentation-entityframeworkcore,
       build-test-instrumentation-eventcounters,

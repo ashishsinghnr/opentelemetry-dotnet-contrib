@@ -82,6 +82,11 @@ flags:
     paths:
       - src/OpenTelemetry.Instrumentation.AspNetCore
 
+  unittests-Instrumentation.AssemblyLoad:
+    carryforward: true
+    paths:
+      - src/OpenTelemetry.Instrumentation.AssemblyLoad
+
   unittests-Instrumentation.AWS:
     carryforward: true
     paths:
@@ -98,11 +103,6 @@ flags:
     carryforward: true
     paths:
       - src/OpenTelemetry.Instrumentation.ConfluentKafka
-
-  unittests-Instrumentation.DependencyInventory:
-    carryforward: true
-    paths:
-      - src/OpenTelemetry.Instrumentation.DependencyInventory
 
   unittests-Instrumentation.ElasticsearchClient:
     carryforward: true

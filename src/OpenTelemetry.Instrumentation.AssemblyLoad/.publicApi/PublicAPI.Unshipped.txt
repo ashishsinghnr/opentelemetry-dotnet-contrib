@@ -1,0 +1,9 @@
+#nullable enable
+OpenTelemetry.Instrumentation.AssemblyLoad.AssemblyLoadInstrumentationOptions
+OpenTelemetry.Instrumentation.AssemblyLoad.AssemblyLoadInstrumentationOptions.AssemblyLoadInstrumentationOptions() -> void
+OpenTelemetry.Instrumentation.AssemblyLoad.AssemblyLoadInstrumentationOptions.Enabled.get -> bool
+OpenTelemetry.Instrumentation.AssemblyLoad.AssemblyLoadInstrumentationOptions.Enabled.set -> void
+OpenTelemetry.Instrumentation.AssemblyLoad.AssemblyLoadInstrumentationOptions.MaxPackages.get -> int
+OpenTelemetry.Instrumentation.AssemblyLoad.AssemblyLoadInstrumentationOptions.MaxPackages.set -> void
+OpenTelemetry.Instrumentation.AssemblyLoad.AssemblyLoadInstrumentation
+static OpenTelemetry.Instrumentation.AssemblyLoad.AssemblyLoadInstrumentation.Start(Microsoft.Extensions.Logging.ILoggerFactory! loggerFactory, OpenTelemetry.Instrumentation.AssemblyLoad.AssemblyLoadInstrumentationOptions? options = null, System.Reflection.Assembly? assembly = null) -> int

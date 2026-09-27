@@ -3,9 +3,9 @@
   <PropertyGroup>
     <TargetFrameworks>$(TargetFrameworksForLibraries)</TargetFrameworks>
     <TargetFrameworks Condition="$(OS) == 'Windows_NT'">$(TargetFrameworks);$(NetFrameworkMinimumSupportedVersion)</TargetFrameworks>
-    <Description>Reports the NuGet packages deployed with an application, for correlation against known vulnerabilities.</Description>
+    <Description>Reports the NuGet packages an application loads at runtime, for correlation against known vulnerabilities.</Description>
     <PackageTags>$(PackageTags);dependencies;sbom;purl</PackageTags>
-    <MinVerTagPrefix>Instrumentation.DependencyInventory-</MinVerTagPrefix>
+    <MinVerTagPrefix>Instrumentation.AssemblyLoad-</MinVerTagPrefix>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$([MSBuild]::GetTargetFrameworkIdentifier(`$(TargetFramework)`))' == '.NETCoreApp'">
@@ -20,15 +20,19 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Configuration" />
-    <PackageReference Include="OpenTelemetry" />
-    <PackageReference Include="System.Text.Json" Condition="'$([MSBuild]::GetTargetFrameworkIdentifier(`$(TargetFramework)`))' != '.NETCoreApp'" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
 
   <ItemGroup>
     <Compile Include="$(RepoRoot)\src\Shared\Configuration\*.cs" Link="Includes\Configuration\%(Filename).cs" />
-    <Compile Include="$(RepoRoot)\src\Shared\DepsManifest.cs" Link="Includes\DepsManifest.cs" />
-    <Compile Include="$(RepoRoot)\src\Shared\DepsManifestPackage.cs" Link="Includes\DepsManifestPackage.cs" Condition="'$([MSBuild]::GetTargetFrameworkIdentifier(`$(TargetFramework)`))' == '.NETCoreApp'" />
+    <Compile Include="$(RepoRoot)\src\Shared\EnvironmentVariables\*.cs" Link="Includes\EnvironmentVariables\%(Filename).cs" />
     <Compile Include="$(RepoRoot)\src\Shared\Guard.cs" Link="Includes\Guard.cs" />
+  </ItemGroup>
+
+  <!-- Only .NET (Core) produces a .deps.json manifest. -->
+  <ItemGroup Condition="'$([MSBuild]::GetTargetFrameworkIdentifier(`$(TargetFramework)`))' == '.NETCoreApp'">
+    <Compile Include="$(RepoRoot)\src\Shared\DepsManifest.cs" Link="Includes\DepsManifest.cs" />
+    <Compile Include="$(RepoRoot)\src\Shared\DepsManifestPackage.cs" Link="Includes\DepsManifestPackage.cs" />
   </ItemGroup>
 
 </Project>

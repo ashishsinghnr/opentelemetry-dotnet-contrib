@@ -4,12 +4,12 @@
 using System.Text;
 using OpenTelemetry.Internal;
 
-namespace OpenTelemetry.Instrumentation.DependencyInventory.Tests;
+namespace OpenTelemetry.Instrumentation.AssemblyLoad.Tests;
 
-public class DepsManifestPackagesTests
+public class DepsManifestTests
 {
     [Fact]
-    public void EveryPackageInTheManifestIsReported()
+    public void EveryPackageInTheManifestIsRead()
     {
         const string Manifest = """
         {
@@ -45,8 +45,7 @@ public class DepsManifestPackagesTests
     [Fact]
     public void PackageVersionComesFromLibraryKeyNotAssemblyVersion()
     {
-        // Newtonsoft.Json 13.0.3 ships assembly version 13.0.0.0. The Package
-        // URL must carry the package version, which only the library key holds.
+        // Newtonsoft.Json 13.0.3 ships assembly version 13.0.0.0.
         const string Manifest = """
         {
           "targets": {
@@ -71,11 +70,20 @@ public class DepsManifestPackagesTests
         Assert.Equal("pkg:nuget/Newtonsoft.Json@13.0.3", package.Purl);
     }
 
+    [Theory]
+    [InlineData("Newtonsoft.Json", "13.0.3", "pkg:nuget/Newtonsoft.Json@13.0.3")]
+    [InlineData("Microsoft_Some-Pkg.Core", "2.0.0-beta.1", "pkg:nuget/Microsoft_Some-Pkg.Core@2.0.0-beta.1")]
+    [InlineData("Pakët.Core", "1.0.0", "pkg:nuget/Pak%C3%ABt.Core@1.0.0")]
+    public void PurlPercentEncodesOnlyCharactersOutsideTheAllowedSet(string name, string version, string expected)
+    {
+        // Case is preserved; only non-ASCII characters are encoded, as UTF-8.
+        Assert.Equal(expected, new DepsManifestPackage(name, version, []).Purl);
+    }
+
     [Fact]
     public void ProjectOutputIsExcluded()
     {
-        // The application's own output has no published identity, so it is not
-        // part of the dependency inventory.
+        // Project output has no published identity.
         const string Manifest = """
         {
           "targets": {
@@ -97,9 +105,9 @@ public class DepsManifestPackagesTests
     }
 
     [Fact]
-    public void PackagesAppearingInSeveralTargetsAreReportedOnce()
+    public void PackageInSeveralTargetsIsReadOnce()
     {
-        // A runtime-specific manifest repeats libraries across targets.
+        // A runtime-specific manifest repeats libraries per target.
         const string Manifest = """
         {
           "targets": {
@@ -120,11 +128,8 @@ public class DepsManifestPackagesTests
     }
 
     [Fact]
-    public void PackageWithNoRuntimeAssetsIsStillReported()
+    public void PackageWithNoRuntimeAssetsHasNoAssemblies()
     {
-        // A package can be deployed while contributing no runtime assembly, and
-        // it still carries any known vulnerabilities. It is reported with no
-        // assemblies, which leaves it correctly marked as not loaded.
         const string Manifest = """
         {
           "targets": {
@@ -143,9 +148,9 @@ public class DepsManifestPackagesTests
     }
 
     [Fact]
-    public void PlaceholderRuntimeAssetIsNotTreatedAsAnAssembly()
+    public void PlaceholderRuntimeAssetIsNotAnAssembly()
     {
-        // "_._" marks a target framework that intentionally ships nothing.
+        // "_._" marks a framework the package intentionally ships nothing for.
         const string Manifest = """
         {
           "targets": {
@@ -163,10 +168,8 @@ public class DepsManifestPackagesTests
     }
 
     [Fact]
-    public void SuppliedAssembliesAreRecorded()
+    public void EveryRuntimeAssemblyOfAPackageIsRead()
     {
-        // One package can ship several assemblies, and the loaded overlay needs
-        // all of them to decide whether the package is in use.
         const string Manifest = """
         {
           "targets": {
@@ -205,17 +208,13 @@ public class DepsManifestPackagesTests
     [InlineData("""{ "targets": { ".NETCoreApp,Version=v8.0": { "A/1.0": { "runtime": { "A.dll": {} } } } }, "libraries": { "A/1.0": { "type": 5 } } }""")]
     public void MalformedManifestYieldsNoPackages(string manifest)
     {
-        // A malformed manifest must yield an empty inventory rather than throw:
-        // an exception here is reported as a failure and no packages at all, which
-        // a backend cannot distinguish from an application with no dependencies.
+        // Valid JSON of an unexpected shape must not throw.
         Assert.Empty(ReadPackages(manifest));
     }
 
     [Fact]
-    public void PlaceholderAssetIsIgnoredButRealUnderscoreAssemblyIsKept()
+    public void PlaceholderIsMatchedOnTheWholeFileName()
     {
-        // "_._" is a placeholder for shipping nothing, matched on the whole file
-        // name so a real "_.dll" is still reported.
         const string Manifest = """
         {
           "targets": {
@@ -243,10 +242,8 @@ public class DepsManifestPackagesTests
     }
 
     [Fact]
-    public void LibraryWithNoTypeIsNotReported()
+    public void LibraryNotDeclaredAPackageIsSkipped()
     {
-        // Without a "libraries" entry declaring it a package, a library cannot
-        // be confirmed as published and is left out.
         const string Manifest = """
         {
           "targets": {
@@ -262,65 +259,9 @@ public class DepsManifestPackagesTests
     }
 
     [Fact]
-    public void ChecksumIsSplitFromItsAlgorithmPrefix()
-    {
-        // NuGet records the hash as "<algorithm>-<base64>".
-        const string Manifest = """
-        {
-          "targets": {
-            ".NETCoreApp,Version=v8.0": {
-              "Serilog/4.0.0": { "runtime": { "lib/net8.0/Serilog.dll": {} } }
-            }
-          },
-          "libraries": {
-            "Serilog/4.0.0": {
-              "type": "package",
-              "sha512": "sha512-LM5IKPSylMYp42YC9bnL+JNUnQUS2y9TgoFLjnqeXLpDvqeyiQ=="
-            }
-          }
-        }
-        """;
-
-        var package = Assert.Single(ReadPackages(Manifest));
-
-        Assert.Equal("sha512", package.ChecksumAlgorithm);
-        Assert.Equal("LM5IKPSylMYp42YC9bnL+JNUnQUS2y9TgoFLjnqeXLpDvqeyiQ==", package.Checksum);
-    }
-
-    [Theory]
-    [InlineData("""{ "type": "package" }""")]
-    [InlineData("""{ "type": "package", "sha512": "" }""")]
-    [InlineData("""{ "type": "package", "sha512": "nodashhere" }""")]
-    [InlineData("""{ "type": "package", "sha512": "-leadingdash" }""")]
-    [InlineData("""{ "type": "package", "sha512": "trailingdash-" }""")]
-    [InlineData("""{ "type": "package", "sha512": 5 }""")]
-    public void PackageWithNoUsableChecksumReportsNone(string libraryEntry)
-    {
-        // An absent or unprefixed hash is reported as none rather than guessed at,
-        // because a hash of an unknown algorithm cannot be verified.
-        var manifest = $$"""
-        {
-          "targets": {
-            ".NETCoreApp,Version=v8.0": {
-              "Serilog/4.0.0": { "runtime": { "lib/net8.0/Serilog.dll": {} } }
-            }
-          },
-          "libraries": { "Serilog/4.0.0": {{libraryEntry}} }
-        }
-        """;
-
-        var package = Assert.Single(ReadPackages(manifest));
-
-        Assert.Null(package.Checksum);
-        Assert.Null(package.ChecksumAlgorithm);
-    }
-
-    [Fact]
     public void HostManifestListIsSplitOnSemicolonOnEveryPlatform()
     {
-        // The host separates the paths with a semicolon everywhere, so splitting
-        // on Path.PathSeparator would yield the whole list as one entry on Unix
-        // and never match.
+        // Path.PathSeparator is ':' on Unix and would never match.
         var directory = Directory.CreateTempSubdirectory("DepsManifestTests");
 
         try
